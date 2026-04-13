@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +33,7 @@ class CreateMeetingCardsTest {
 
     @Test
     void createsMeetingCardsWithPrefix() {
+        when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Team Sync"),
                 new Meeting("1:1 with Ivan")
@@ -46,6 +48,7 @@ class CreateMeetingCardsTest {
 
     @Test
     void excludesLunchAndNoMeetingsEvents() {
+        when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Team Sync"),
                 new Meeting("Lunch"),
@@ -62,16 +65,19 @@ class CreateMeetingCardsTest {
 
     @Test
     void returnsEmptyListWhenCalendarIsEmpty() {
+        when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of());
 
         var result = useCase.execute(DATE);
 
         assertThat(result).isEmpty();
-        verifyNoInteractions(board);
+        verify(board).isMeetingListEmpty();
+        verifyNoMoreInteractions(board);
     }
 
     @Test
     void returnsEmptyListWhenAllEventsAreExcluded() {
+        when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Lunch"),
                 new Meeting("NO MEETINGS, PLEASE")
@@ -80,6 +86,17 @@ class CreateMeetingCardsTest {
         var result = useCase.execute(DATE);
 
         assertThat(result).isEmpty();
-        verifyNoInteractions(board);
+        verify(board).isMeetingListEmpty();
+        verifyNoMoreInteractions(board);
+    }
+
+    @Test
+    void throwsWhenMeetingListIsNotEmpty() {
+        when(board.isMeetingListEmpty()).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.execute(DATE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Meetings list is not empty");
+        verifyNoInteractions(calendar);
     }
 }

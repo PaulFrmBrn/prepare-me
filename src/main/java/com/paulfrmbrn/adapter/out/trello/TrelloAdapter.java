@@ -37,6 +37,15 @@ public class TrelloAdapter implements MeetingBoardPort {
     }
 
     @Override
+    public boolean isMeetingListEmpty() {
+        try {
+            return get("/lists/" + getListId() + "/cards?fields=id").isEmpty();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Failed to check Meetings list: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void createCard(String name) {
         try {
             String body = MAPPER.writeValueAsString(Map.of(

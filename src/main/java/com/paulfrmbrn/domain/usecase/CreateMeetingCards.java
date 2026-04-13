@@ -22,6 +22,9 @@ public class CreateMeetingCards implements CreateMeetingCardsUseCase {
 
     @Override
     public List<String> execute(LocalDate date) {
+        if (!board.isMeetingListEmpty()) {
+            throw new IllegalStateException("Meetings list is not empty — clear it before running draft-plan");
+        }
         var cardNames = calendar.getMeetings(date).stream()
                 .filter(m -> !EXCLUDED.contains(m.name()))
                 .map(m -> "Meeting: " + m.name())
