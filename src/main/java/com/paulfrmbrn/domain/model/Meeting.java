@@ -1,3 +1,5 @@
 package com.paulfrmbrn.domain.model;
 
-public record Meeting(String name) {}
+import java.util.List;
+
+public record Meeting(String name, List<String> attendees) {}

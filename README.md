@@ -60,6 +60,8 @@ Open `~/.prepare-me/settings.yaml` and set:
 - `trello.apiToken` — the token from step 4
 - `trello.boardName` — exact name of your Trello board (case-sensitive)
 - `trello.meetingsListName` — exact name of the list to create cards in
+- `docMappings` — map of calendar event title → notes document name in Google Drive, used by `create-agenda` for group meetings and any 1-1 that isn't auto-detected. If a meeting is missing from this map, it is skipped with a message telling you what to add.
+- `excludedEvents` — list of calendar event titles to ignore during `draft-plan` (e.g. "Out of office", "Lunch"). The template includes common defaults; extend it for any recurring non-meeting events on your calendar.
 
 The Google credentials path is already set to the correct default.
 
@@ -68,21 +70,23 @@ Alternatively, you can skip copying and edit `settings.yaml` directly in the pro
 ### 4. Build
 
 ```bash
-gradle wrapper   # only needed once if ./gradlew doesn't exist yet
-./gradlew build
+gradle wrapper        # only needed once if ./gradlew doesn't exist yet
+./gradlew installDist # builds the app to build/install/prepare-me/
 ```
 
 ## Usage
 
 ```bash
 # Create meeting cards for today
-./gradlew run --args="draft-plan --date 2026-04-14"
+build/install/prepare-me/bin/prepare-me draft-plan --date 2026-04-14
 
 # After adding topic cards manually in Trello:
-./gradlew run --args="create-agenda --date 2026-04-14"
+build/install/prepare-me/bin/prepare-me create-agenda --date 2026-04-14
 ```
 
-On the first run a browser tab will open for Google OAuth — approve it and the token is saved to `.tokens/` and reused on every subsequent run.
+Run `./gradlew installDist` again whenever you rebuild after a code change.
+
+On the first run a browser tab will open for Google OAuth — approve it and the token is saved to `~/.prepare-me/tokens/` and reused on every subsequent run.
 
 ## Architecture
 

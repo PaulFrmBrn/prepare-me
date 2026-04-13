@@ -15,14 +15,14 @@ public class CreateMeetingCards implements CreateMeetingCardsUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CreateMeetingCards.class);
 
-    private static final Set<String> EXCLUDED = Set.of("NO MEETINGS, PLEASE", "Lunch");
-
     private final CalendarPort calendar;
     private final MeetingBoardPort board;
+    private final Set<String> excluded;
 
-    public CreateMeetingCards(CalendarPort calendar, MeetingBoardPort board) {
+    public CreateMeetingCards(CalendarPort calendar, MeetingBoardPort board, Set<String> excluded) {
         this.calendar = calendar;
         this.board = board;
+        this.excluded = excluded;
     }
 
     @Override
@@ -34,7 +34,7 @@ public class CreateMeetingCards implements CreateMeetingCardsUseCase {
         log.info("Calendar events for {}: {}", date, meetings.stream().map(Meeting::name).toList());
 
         var cardNames = meetings.stream()
-                .filter(m -> !EXCLUDED.contains(m.name()))
+                .filter(m -> !excluded.contains(m.name()))
                 .map(m -> "Meeting: " + m.name())
                 .toList();
 

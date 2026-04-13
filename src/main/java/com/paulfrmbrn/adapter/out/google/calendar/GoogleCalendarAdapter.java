@@ -6,6 +6,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
 import com.paulfrmbrn.domain.model.Meeting;
+
+import java.util.List;
 import com.paulfrmbrn.domain.port.out.CalendarPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +56,13 @@ public class GoogleCalendarAdapter implements CalendarPort {
             return items.stream()
                     .filter(e -> e.getSummary() != null)
                     .filter(e -> e.getStart().getDateTime() != null) // skip all-day blocks
-                    .map(e -> new Meeting(e.getSummary()))
+                    .map(e -> {
+                        var attendees = e.getAttendees() == null ? List.<String>of()
+                                : e.getAttendees().stream()
+                                        .map(a -> a.getEmail())
+                                        .toList();
+                        return new Meeting(e.getSummary(), attendees);
+                    })
                     .toList();
 
         } catch (IOException | GeneralSecurityException e) {

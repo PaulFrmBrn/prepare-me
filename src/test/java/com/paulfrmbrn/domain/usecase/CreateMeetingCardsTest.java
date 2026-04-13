@@ -1,6 +1,8 @@
 package com.paulfrmbrn.domain.usecase;
 
 import com.paulfrmbrn.domain.model.Meeting;
+
+import java.util.List;
 import com.paulfrmbrn.domain.port.out.CalendarPort;
 import com.paulfrmbrn.domain.port.out.MeetingBoardPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,15 +31,15 @@ class CreateMeetingCardsTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new CreateMeetingCards(calendar, board);
+        useCase = new CreateMeetingCards(calendar, board, Set.of("NO MEETINGS, PLEASE", "Lunch"));
     }
 
     @Test
     void createsMeetingCardsWithPrefix() {
         when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
-                new Meeting("Team Sync"),
-                new Meeting("1:1 with Ivan")
+                new Meeting("Team Sync", List.of()),
+                new Meeting("1:1 with Ivan", List.of())
         ));
 
         var result = useCase.execute(DATE);
@@ -50,10 +53,10 @@ class CreateMeetingCardsTest {
     void excludesLunchAndNoMeetingsEvents() {
         when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
-                new Meeting("Team Sync"),
-                new Meeting("Lunch"),
-                new Meeting("NO MEETINGS, PLEASE"),
-                new Meeting("1:1 with Ivan")
+                new Meeting("Team Sync", List.of()),
+                new Meeting("Lunch", List.of()),
+                new Meeting("NO MEETINGS, PLEASE", List.of()),
+                new Meeting("1:1 with Ivan", List.of())
         ));
 
         var result = useCase.execute(DATE);
@@ -79,8 +82,8 @@ class CreateMeetingCardsTest {
     void returnsEmptyListWhenAllEventsAreExcluded() {
         when(board.isMeetingListEmpty()).thenReturn(true);
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
-                new Meeting("Lunch"),
-                new Meeting("NO MEETINGS, PLEASE")
+                new Meeting("Lunch", List.of()),
+                new Meeting("NO MEETINGS, PLEASE", List.of())
         ));
 
         var result = useCase.execute(DATE);

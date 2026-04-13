@@ -1,11 +1,15 @@
 package com.paulfrmbrn;
 
+import com.paulfrmbrn.adapter.in.cli.CreateAgendaCommand;
 import com.paulfrmbrn.adapter.in.cli.DraftPlanCommand;
 import com.paulfrmbrn.adapter.in.cli.PrepareCommand;
 import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
 import com.paulfrmbrn.adapter.out.google.calendar.GoogleCalendarAdapter;
+import com.paulfrmbrn.adapter.out.google.notes.GoogleNotesAdapter;
+import com.paulfrmbrn.adapter.out.mapping.ManualDocNameResolverAdapter;
 import com.paulfrmbrn.adapter.out.trello.TrelloAdapter;
 import com.paulfrmbrn.domain.usecase.CreateMeetingCards;
+import com.paulfrmbrn.domain.usecase.PrepareMeetingNotes;
 import com.paulfrmbrn.infrastructure.Settings;
 import picocli.CommandLine;
 
@@ -25,10 +29,17 @@ public class Main {
             var calendarAdapter = new GoogleCalendarAdapter(googleAuth);
             var plannerAdapter  = new TrelloAdapter(s.trello.apiKey, s.trello.apiToken,
                                                     s.trello.boardName, s.trello.meetingsListName);
-            var createMeetingCards = new CreateMeetingCards(calendarAdapter, plannerAdapter);
+            var notesAdapter    = new GoogleNotesAdapter(googleAuth);
+            var resolverAdapter = new ManualDocNameResolverAdapter(s.docMappings);
+
+            var createMeetingCards  = new CreateMeetingCards(calendarAdapter, plannerAdapter,
+                                                              new java.util.HashSet<>(s.excludedEvents));
+            var prepareMeetingNotes = new PrepareMeetingNotes(plannerAdapter, calendarAdapter,
+                                                              notesAdapter, resolverAdapter, s.notesDir);
 
             int exit = new CommandLine(new PrepareCommand())
-                    .addSubcommand("draft-plan", new DraftPlanCommand(createMeetingCards))
+                    .addSubcommand("draft-plan",    new DraftPlanCommand(createMeetingCards))
+                    .addSubcommand("create-agenda", new CreateAgendaCommand(prepareMeetingNotes))
                     .setExecutionExceptionHandler((ex, cmd, _) -> {
                         cmd.getErr().println("Error: " + ex.getMessage());
                         return 1;

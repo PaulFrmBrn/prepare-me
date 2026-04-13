@@ -5,11 +5,18 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Settings {
 
     public Google google = new Google();
     public Trello trello = new Trello();
+    public String notesDir = "_Notes";
+    public List<String> excludedEvents = new ArrayList<>();
+    public Map<String, String> docMappings = new LinkedHashMap<>();
 
     public static class Google {
         public String credentialsFile = "~/.prepare-me/google-credentials.json";

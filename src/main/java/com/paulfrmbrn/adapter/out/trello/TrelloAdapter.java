@@ -2,6 +2,7 @@ package com.paulfrmbrn.adapter.out.trello;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.paulfrmbrn.domain.model.MeetingWithTopics;
 import com.paulfrmbrn.domain.port.out.MeetingBoardPort;
 
 import java.io.IOException;
@@ -9,6 +10,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class TrelloAdapter implements MeetingBoardPort {
@@ -65,6 +68,35 @@ public class TrelloAdapter implements MeetingBoardPort {
             }
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Failed to create Trello card: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<MeetingWithTopics> getMeetingsWithTopics() {
+        try {
+            var cards = get("/lists/" + getListId() + "/cards?fields=name");
+            List<MeetingWithTopics> result = new ArrayList<>();
+            String currentMeeting = null;
+            List<String> currentTopics = null;
+
+            for (JsonNode card : cards) {
+                String name = card.get("name").asText();
+                if (name.startsWith("Meeting: ")) {
+                    if (currentMeeting != null) {
+                        result.add(new MeetingWithTopics(currentMeeting, List.copyOf(currentTopics)));
+                    }
+                    currentMeeting = name;
+                    currentTopics = new ArrayList<>();
+                } else if (currentMeeting != null) {
+                    currentTopics.add(name);
+                }
+            }
+            if (currentMeeting != null) {
+                result.add(new MeetingWithTopics(currentMeeting, List.copyOf(currentTopics)));
+            }
+            return result;
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Failed to fetch meetings with topics: " + e.getMessage(), e);
         }
     }
 

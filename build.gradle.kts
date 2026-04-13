@@ -28,6 +28,10 @@ dependencies {
     implementation("com.google.apis:google-api-services-calendar:v3-rev20240111-2.0.0")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.34.1")
 
+    // Google Drive + Docs API (create-agenda)
+    implementation("com.google.apis:google-api-services-drive:v3-rev20260405-2.0.0")
+    implementation("com.google.apis:google-api-services-docs:v1-rev20260406-2.0.0")
+
     // YAML settings + Trello JSON parsing
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.4")
 
@@ -47,6 +51,10 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.named<JavaExec>("run") {
+    standardInput = System.`in`
 }
 
 tasks.compileJava {

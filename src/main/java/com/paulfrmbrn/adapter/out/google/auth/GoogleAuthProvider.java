@@ -9,6 +9,7 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.drive.DriveScopes;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -21,7 +22,9 @@ import java.util.List;
 public class GoogleAuthProvider {
 
     private static final List<String> SCOPES = List.of(
-            CalendarScopes.CALENDAR_READONLY
+            CalendarScopes.CALENDAR_READONLY,
+            DriveScopes.DRIVE_READONLY,
+            "https://www.googleapis.com/auth/documents"
     );
 
     private final String credentialsFile;
