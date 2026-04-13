@@ -1,17 +1,40 @@
 package com.paulfrmbrn;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class Main {
-    public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
+import com.paulfrmbrn.adapter.in.cli.Phase1Command;
+import com.paulfrmbrn.adapter.in.cli.PrepareCommand;
+import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
+import com.paulfrmbrn.adapter.out.google.calendar.GoogleCalendarAdapter;
+import com.paulfrmbrn.adapter.out.trello.TrelloAdapter;
+import com.paulfrmbrn.domain.usecase.CreateMeetingCards;
+import com.paulfrmbrn.infrastructure.Settings;
+import picocli.CommandLine;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
+import java.nio.file.Path;
+
+public class Main {
+
+    public static void main(String[] args) {
+        try {
+            Path configPath = Settings.defaultPath();
+            Settings s = Settings.load(configPath);
+
+            var googleAuth = new GoogleAuthProvider(
+                    Settings.expand(s.google.credentialsFile),
+                    Settings.expand(s.google.tokensDir));
+
+            var calendarAdapter = new GoogleCalendarAdapter(googleAuth);
+            var plannerAdapter  = new TrelloAdapter(s.trello.apiKey, s.trello.apiToken,
+                                                    s.trello.boardName, s.trello.meetingsListName);
+            var createMeetingCards = new CreateMeetingCards(calendarAdapter, plannerAdapter);
+
+            int exit = new CommandLine(new PrepareCommand())
+                    .addSubcommand("phase1", new Phase1Command(createMeetingCards))
+                    .execute(args);
+
+            System.exit(exit);
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            System.exit(1);
         }
     }
 }

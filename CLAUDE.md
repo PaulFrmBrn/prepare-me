@@ -14,6 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Java 23 Gradle (Kotlin DSL) project (`group: com.paulfrmbrn`, `name: prepare-me`). Currently a minimal starter — single entry point at `src/main/java/com/paulfrmbrn/Main.java`.
+Java 23 Gradle (Kotlin DSL) project (`group: com.paulfrmbrn`, `name: prepare-me`). Entry point: `com.paulfrmbrn.Main` (composition root — wires adapters into use cases and registers Picocli subcommands).
 
-JUnit 5 is configured as the test framework. Add test classes under `src/test/java/com/paulfrmbrn/`.
+Hexagonal architecture: domain ports in `domain/port/`, use cases in `domain/usecase/`, adapters in `adapter/out/` (Google Calendar, Trello) and `adapter/in/cli/`. Settings loaded from `~/.prepare-me/settings.yaml` — copy `settings.yaml` from project root as a template.
+
+Tests use JUnit 5 + Mockito + AssertJ. Unit tests live alongside the domain layer in `src/test/java/com/paulfrmbrn/domain/`.
