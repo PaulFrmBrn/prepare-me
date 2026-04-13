@@ -8,18 +8,18 @@ import java.time.LocalDate;
 import java.util.concurrent.Callable;
 
 @Command(
-        name = "phase1",
+        name = "draft-plan",
         mixinStandardHelpOptions = true,
         description = "Fetch today's calendar meetings and create Trello cards for each one"
 )
-public class Phase1Command implements Callable<Integer> {
+public class DraftPlanCommand implements Callable<Integer> {
 
     @Option(names = "--date", description = "Date in yyyy-MM-dd format (default: today)")
     private LocalDate date = LocalDate.now();
 
     private final CreateMeetingCardsUseCase useCase;
 
-    public Phase1Command(CreateMeetingCardsUseCase useCase) {
+    public DraftPlanCommand(CreateMeetingCardsUseCase useCase) {
         this.useCase = useCase;
     }
 

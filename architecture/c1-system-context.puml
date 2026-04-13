@@ -3,7 +3,7 @@
 
 Person(user, "User (Dmitry)", "Prepares daily meeting agenda each morning")
 
-System(app, "Prepare Me", "CLI tool that automates Phase 1 (Calendar → Trello) and Phase 2 (Trello + Drive → Meeting notes)")
+System(app, "Prepare Me", "CLI tool that automates Draft Plan (Calendar → Trello) and Create Agenda (Trello + Drive → Meeting notes)")
 
 System_Ext(gcal,   "Google Calendar",     "Stores daily events and attendee lists")
 System_Ext(trello, "Trello",              "'work' board - 'Meetings' list holds ordered meeting and topic cards")
@@ -11,7 +11,7 @@ System_Ext(gdrive, "Google Drive / Docs", "'_Notes/People' (1-1s) and '_Notes/Te
 System_Ext(gauth,  "Google OAuth 2.0",    "Authentication for Calendar, Drive, and Docs")
 System_Ext(tauth,  "Trello OAuth 1.0a",   "Authentication for Trello REST API (separate from Google SSO)")
 
-Rel(user, app,    "Runs phase1 / phase2 commands via terminal")
+Rel(user, app,    "Runs draft-plan / create-agenda commands via terminal")
 Rel(app,  gcal,   "Reads events for selected date",      "Google Calendar API v3 / HTTPS")
 Rel(app,  trello, "Creates and reads meeting cards",      "Trello REST API / HTTPS")
 Rel(app,  gdrive, "Searches docs, appends dated agenda",  "Drive API v3 + Docs API v1 / HTTPS")

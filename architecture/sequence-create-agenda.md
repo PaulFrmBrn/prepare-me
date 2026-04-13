@@ -1,4 +1,4 @@
-# Sequence Diagram — Basic Flow
+# Sequence Diagram — Create Agenda (phase 2)
 
 ```mermaid
 sequenceDiagram
@@ -12,29 +12,9 @@ sequenceDiagram
     participant Notes as Notes Storage Adapter
     participant DriveAPI as Google Drive API
     participant DocsAPI as Google Docs API
+    participant Mapping as Doc Name Mapping<br/>(~/.prepare-me/doc-mappings.yaml)
 
-    %% ── PHASE 1 ──────────────────────────────────────────────────────────────
-    User->>CLI: prepare-me phase1 --date 2026-04-12
-    CLI->>UC: CreateMeetingCards.execute("2026-04-12")
-
-    UC->>Cal: getFilteredMeetings("2026-04-12")
-    Cal->>GCal: GET /calendars/primary/events?timeMin&timeMax
-    GCal-->>Cal: List<Event>
-    Cal-->>UC: meetings (excl. "NO MEETINGS, PLEASE", "Lunch")
-
-    loop For each meeting
-        UC->>Planner: createCard("Meeting: <event title>", list="Meetings")
-        Planner->>TrelloAPI: POST /cards
-        TrelloAPI-->>Planner: Card created
-    end
-
-    UC-->>CLI: List of created card names
-    CLI-->>User: Prints created card names
-
-    Note over User,CLI: (OOTS) User manually adds topic cards under each<br/>Meeting card in Planner and reorders as needed
-
-    %% ── PHASE 2 ──────────────────────────────────────────────────────────────
-    User->>CLI: prepare-me phase2 --date 2026-04-12
+    User->>CLI: prepare-me create-agenda --date 2026-04-12
     CLI->>UC: PrepareMeetingNotes.execute("2026-04-12")
 
     UC->>Planner: getMeetingsWithTopics(list="Meetings")
@@ -42,7 +22,7 @@ sequenceDiagram
     TrelloAPI-->>Planner: Ordered card list
     Planner-->>UC: meetings with grouped topic cards
 
-    UC->>Cal: getFilteredMeetings("2026-04-12")
+    UC->>Cal: getMeetings("2026-04-12")
     Cal->>GCal: GET /calendars/primary/events
     GCal-->>Cal: List<Event>
     Cal-->>UC: events with attendee lists
@@ -61,10 +41,20 @@ sequenceDiagram
             DocsAPI-->>Notes: OK
             Notes-->>UC: doc URL
         else Group meeting or no doc match
-            UC-->>CLI: unresolved(meetingTitle)
-            CLI-->>User: "Could not find doc for: <title> — please paste Google Doc link:"
-            User->>CLI: pastes doc URL
-            CLI->>UC: resolvedUrl
+            UC->>Mapping: lookup(meetingTitle)
+            alt found in local mapping
+                Mapping-->>UC: docName
+            else not in mapping
+                UC-->>CLI: unresolved(meetingTitle)
+                CLI-->>User: "Could not find doc for: <title> — please enter doc name:"
+                User->>CLI: types doc name
+                CLI->>UC: docName
+                UC->>Mapping: save(meetingTitle → docName)
+            end
+            UC->>Notes: findDoc(docName, GROUP)
+            Notes->>DriveAPI: GET /files?q=name contains '<docName>'
+            DriveAPI-->>Notes: Matched file
+            Notes-->>UC: docId + URL
             UC->>Notes: appendAgenda(docId, "2026-04-12", [topics])
             Notes->>DocsAPI: POST /documents/{docId}/batchUpdate
             DocsAPI-->>Notes: OK

@@ -1,6 +1,6 @@
 package com.paulfrmbrn;
 
-import com.paulfrmbrn.adapter.in.cli.Phase1Command;
+import com.paulfrmbrn.adapter.in.cli.DraftPlanCommand;
 import com.paulfrmbrn.adapter.in.cli.PrepareCommand;
 import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
 import com.paulfrmbrn.adapter.out.google.calendar.GoogleCalendarAdapter;
@@ -28,7 +28,7 @@ public class Main {
             var createMeetingCards = new CreateMeetingCards(calendarAdapter, plannerAdapter);
 
             int exit = new CommandLine(new PrepareCommand())
-                    .addSubcommand("phase1", new Phase1Command(createMeetingCards))
+                    .addSubcommand("draft-plan", new DraftPlanCommand(createMeetingCards))
                     .execute(args);
 
             System.exit(exit);

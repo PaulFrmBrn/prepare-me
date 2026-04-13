@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class Phase1CommandTest {
+class DraftPlanCommandTest {
 
     @Mock CreateMeetingCardsUseCase useCase;
 
@@ -69,6 +69,6 @@ class Phase1CommandTest {
     }
 
     private void run(String... args) {
-        new CommandLine(new Phase1Command(useCase)).execute(args);
+        new CommandLine(new DraftPlanCommand(useCase)).execute(args);
     }
 }

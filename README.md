@@ -6,13 +6,13 @@ A CLI tool that automates the daily meeting preparation routine — turning a Go
 
 Each working day involves two automated phases separated by a short manual step:
 
-**Phase 1** — Pull today's meetings from Google Calendar and create a Trello card for each one in the *Meetings* list of the *work* board.
+**Draft Plan** — Pull today's meetings from Google Calendar and create a Trello card for each one in the *Meetings* list of the *work* board.
 
-**Manual step (not automated)** — Reorder the Trello cards and add topic cards beneath each meeting card following your own judgement.
+**Add Topics (not automated)** — Reorder the Trello cards and add topic cards beneath each meeting card following your own judgement.
 
-**Phase 2** — Read the ordered Trello cards, locate the Google Doc for each meeting, and append a dated heading (`yyyy-MM-dd`) with the agenda topics pulled from Trello.
+**Create Agenda** — Read the ordered Trello cards, locate the Google Doc for each meeting, and append a dated heading (`yyyy-MM-dd`) with the agenda topics pulled from Trello.
 
-At the end of Phase 2 the tool prints a numbered list of Google Doc links — one per meeting — ready to open before each call.
+At the end of Create Agenda the tool prints a numbered list of Google Doc links — one per meeting — ready to open before each call.
 
 ## Setup
 
@@ -76,10 +76,10 @@ gradle wrapper   # only needed once if ./gradlew doesn't exist yet
 
 ```bash
 # Create meeting cards for today
-./gradlew run --args="phase1 --date 2026-04-14"
+./gradlew run --args="draft-plan --date 2026-04-14"
 
 # After adding topic cards manually in Trello:
-./gradlew run --args="phase2 --date 2026-04-14"
+./gradlew run --args="create-agenda --date 2026-04-14"
 ```
 
 On the first run a browser tab will open for Google OAuth — approve it and the token is saved to `.tokens/` and reused on every subsequent run.
@@ -90,7 +90,8 @@ On the first run a browser tab will open for Google OAuth — approve it and the
 |---|---|
 | [C1 — System Context](architecture/c1-system-context.puml) | The app and its external dependencies |
 | [C2 — Containers](architecture/c2-containers.puml) | Internal structure and adapter boundaries |
-| [Sequence — Basic Flow](architecture/sequence-basic-flow.md) | End-to-end flow across both phases |
+| [Sequence — Draft Plan](architecture/sequence-draft-plan.md) | End-to-end flow for the draft-plan command |
+| [Sequence — Create Agenda](architecture/sequence-create-agenda.md) | End-to-end flow for the create-agenda command |
 | [Domain Vocabulary](architecture/domain-vocabulary.md) | Key concepts, port definitions, and naming conventions |
 
 The application follows a hexagonal (ports & adapters) architecture. The domain layer has no dependency on Google, Trello, or any I/O framework. See [Domain Vocabulary](architecture/domain-vocabulary.md) for the full concept map.
