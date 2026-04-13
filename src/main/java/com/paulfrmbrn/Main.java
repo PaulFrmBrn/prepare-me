@@ -29,7 +29,7 @@ public class Main {
 
             int exit = new CommandLine(new PrepareCommand())
                     .addSubcommand("draft-plan", new DraftPlanCommand(createMeetingCards))
-                    .setExecutionExceptionHandler((ex, cmd, parseResult) -> {
+                    .setExecutionExceptionHandler((ex, cmd, _) -> {
                         cmd.getErr().println("Error: " + ex.getMessage());
                         return 1;
                     })

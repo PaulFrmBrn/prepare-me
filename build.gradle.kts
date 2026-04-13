@@ -29,13 +29,20 @@ dependencies {
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.34.1")
 
     // YAML settings + Trello JSON parsing
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.4")
+
+    // Transitive CVE fixes
+    implementation("com.google.guava:guava:33.4.8-jre")
+
+    // Logging
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.18")
 
     // Tests
     testImplementation(platform("org.junit:junit-bom:5.11.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-junit-jupiter:5.14.2")
-    testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.assertj:assertj-core:3.27.3")
 }
 
 tasks.test {

@@ -1,14 +1,19 @@
 package com.paulfrmbrn.domain.usecase;
 
+import com.paulfrmbrn.domain.model.Meeting;
 import com.paulfrmbrn.domain.port.in.CreateMeetingCardsUseCase;
 import com.paulfrmbrn.domain.port.out.CalendarPort;
 import com.paulfrmbrn.domain.port.out.MeetingBoardPort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
 public class CreateMeetingCards implements CreateMeetingCardsUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(CreateMeetingCards.class);
 
     private static final Set<String> EXCLUDED = Set.of("NO MEETINGS, PLEASE", "Lunch");
 
@@ -25,7 +30,10 @@ public class CreateMeetingCards implements CreateMeetingCardsUseCase {
         if (!board.isMeetingListEmpty()) {
             throw new IllegalStateException("Meetings list is not empty — clear it before running draft-plan");
         }
-        var cardNames = calendar.getMeetings(date).stream()
+        var meetings = calendar.getMeetings(date);
+        log.info("Calendar events for {}: {}", date, meetings.stream().map(Meeting::name).toList());
+
+        var cardNames = meetings.stream()
                 .filter(m -> !EXCLUDED.contains(m.name()))
                 .map(m -> "Meeting: " + m.name())
                 .toList();

@@ -15,7 +15,7 @@ import java.util.concurrent.Callable;
 public class DraftPlanCommand implements Callable<Integer> {
 
     @Option(names = "--date", description = "Date in yyyy-MM-dd format (default: today)")
-    private LocalDate date = LocalDate.now();
+    private final LocalDate date = LocalDate.now();
 
     private final CreateMeetingCardsUseCase useCase;
 

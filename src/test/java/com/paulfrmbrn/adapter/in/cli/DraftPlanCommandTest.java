@@ -42,7 +42,7 @@ class DraftPlanCommandTest {
     void printsEachCreatedCard() {
         when(useCase.execute(any())).thenReturn(List.of("Meeting: Team Sync", "Meeting: 1:1 with Ivan"));
 
-        run("--date", "2026-04-14");
+        run();
 
         assertThat(out.toString())
                 .contains("Created 2 card(s)")
@@ -54,7 +54,7 @@ class DraftPlanCommandTest {
     void printsNoMeetingsMessageWhenListIsEmpty() {
         when(useCase.execute(any())).thenReturn(List.of());
 
-        run("--date", "2026-04-14");
+        run();
 
         assertThat(out.toString()).contains("No meetings found");
     }
@@ -63,12 +63,12 @@ class DraftPlanCommandTest {
     void passesDateToUseCase() {
         when(useCase.execute(LocalDate.of(2026, 4, 14))).thenReturn(List.of("Meeting: Sync"));
 
-        run("--date", "2026-04-14");
+        run();
 
         assertThat(out.toString()).contains("Meeting: Sync");
     }
 
-    private void run(String... args) {
-        new CommandLine(new DraftPlanCommand(useCase)).execute(args);
+    private void run() {
+        new CommandLine(new DraftPlanCommand(useCase)).execute("--date", "2026-04-14");
     }
 }
