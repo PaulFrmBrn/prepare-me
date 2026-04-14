@@ -2,7 +2,9 @@ package com.paulfrmbrn.adapter.out.trello;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.paulfrmbrn.domain.model.Checklist;
 import com.paulfrmbrn.domain.model.MeetingWithTopics;
+import com.paulfrmbrn.domain.model.Topic;
 import com.paulfrmbrn.domain.port.out.MeetingBoardPort;
 
 import java.io.IOException;
@@ -13,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class TrelloAdapter implements MeetingBoardPort {
 
@@ -74,10 +77,10 @@ public class TrelloAdapter implements MeetingBoardPort {
     @Override
     public List<MeetingWithTopics> getMeetingsWithTopics() {
         try {
-            var cards = get("/lists/" + getListId() + "/cards?fields=name");
+            var cards = get("/lists/" + getListId() + "/cards?fields=name,id&checklists=all");
             List<MeetingWithTopics> result = new ArrayList<>();
             String currentMeeting = null;
-            List<String> currentTopics = null;
+            List<Topic> currentTopics = null;
 
             for (JsonNode card : cards) {
                 String name = card.get("name").asText();
@@ -88,7 +91,7 @@ public class TrelloAdapter implements MeetingBoardPort {
                     currentMeeting = name;
                     currentTopics = new ArrayList<>();
                 } else if (currentMeeting != null) {
-                    currentTopics.add(name);
+                    currentTopics.add(parseTopicCard(card));
                 }
             }
             if (currentMeeting != null) {
@@ -98,6 +101,41 @@ public class TrelloAdapter implements MeetingBoardPort {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Failed to fetch meetings with topics: " + e.getMessage(), e);
         }
+    }
+
+    private Topic parseTopicCard(JsonNode card) {
+        String name = card.get("name").asText();
+        List<Checklist> checklists = new ArrayList<>();
+
+        JsonNode checklistsNode = card.get("checklists");
+        if (checklistsNode != null && checklistsNode.isArray()) {
+            for (JsonNode cl : checklistsNode) {
+                String clName = cl.get("name").asText();
+                Optional<String> lastUnchecked = findFirstUncheckedItem(cl.get("checkItems"));
+                checklists.add(new Checklist(clName, lastUnchecked));
+            }
+        }
+
+        return new Topic(name, List.copyOf(checklists));
+    }
+
+    private Optional<String> findFirstUncheckedItem(JsonNode items) {
+        if (items == null || !items.isArray()) return Optional.empty();
+
+        String firstName = null;
+        double firstPos = Double.MAX_VALUE;
+
+        for (JsonNode item : items) {
+            if ("incomplete".equals(item.get("state").asText())) {
+                double pos = item.get("pos").asDouble();
+                if (pos < firstPos) {
+                    firstPos = pos;
+                    firstName = item.get("name").asText();
+                }
+            }
+        }
+
+        return Optional.ofNullable(firstName);
     }
 
     private String getListId() throws IOException, InterruptedException {

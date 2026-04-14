@@ -4,6 +4,8 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.docs.v1.Docs;
 import com.google.api.services.docs.v1.model.BatchUpdateDocumentRequest;
+import com.google.api.services.docs.v1.model.DateElementProperties;
+import com.google.api.services.docs.v1.model.InsertDateRequest;
 import com.google.api.services.docs.v1.model.InsertTextRequest;
 import com.google.api.services.docs.v1.model.Location;
 import com.google.api.services.docs.v1.model.ParagraphStyle;
@@ -13,13 +15,16 @@ import com.google.api.services.docs.v1.model.UpdateParagraphStyleRequest;
 import com.google.api.services.drive.Drive;
 import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
 import com.paulfrmbrn.domain.model.DocRef;
+import com.paulfrmbrn.domain.model.Topic;
 import com.paulfrmbrn.domain.port.out.MeetingNotesPort;
+import com.paulfrmbrn.domain.usecase.AgendaFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -91,7 +96,7 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
     }
 
     @Override
-    public void appendAgenda(DocRef doc, LocalDate date, List<String> topics) {
+    public void appendAgenda(DocRef doc, LocalDate date, String meetingName, List<Topic> topics) {
         try {
             var docs = buildDocs();
 
@@ -102,36 +107,75 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
                     .orElse(1);
             int insertAt = Math.max(1, endIndex - 1);
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("\n").append(date.toString()).append("\n");
-            for (String topic : topics) {
-                sb.append(topic).append("\n");
-            }
+            // Text: \n[space]{meetingName}\n{topics}
+            // The leading space is the separator between the date chip and the meeting name.
+            String text = AgendaFormatter.format(meetingName, topics);
 
             List<Request> requests = new ArrayList<>();
+            // 1. Insert the agenda text
             requests.add(new Request().setInsertText(
                     new InsertTextRequest()
-                            .setText(sb.toString())
+                            .setText(text)
                             .setLocation(new Location().setIndex(insertAt))
             ));
-
-            int headingStart = insertAt + 1;
-            int headingEnd = headingStart + date.toString().length() + 1;
+            // 2. Apply HEADING_1 to the meeting name paragraph (space + meetingName + \n)
+            //    Range uses pre-chip indices; chip is inserted last so indices here are still valid.
             requests.add(new Request().setUpdateParagraphStyle(
                     new UpdateParagraphStyleRequest()
-                            .setRange(new Range().setStartIndex(headingStart).setEndIndex(headingEnd))
+                            .setRange(new Range()
+                                    .setStartIndex(insertAt + 1)
+                                    .setEndIndex(insertAt + meetingName.length() + 3))
                             .setParagraphStyle(new ParagraphStyle().setNamedStyleType("HEADING_1"))
                             .setFields("namedStyleType")
+            ));
+            // 3. Apply HEADING_2/3 to topic and checklist lines
+            requests.addAll(buildHeadingStyleRequests(text, insertAt));
+            // 4. Insert date chip at insertAt+1 (before the space) — done last to avoid
+            //    shifting the indices used in requests 2 and 3
+            requests.add(new Request().setInsertDate(
+                    new InsertDateRequest()
+                            .setLocation(new Location().setIndex(insertAt + 1))
+                            .setDateElementProperties(new DateElementProperties()
+                                    .setDateFormat("DATE_FORMAT_ISO8601")
+                                    .setTimestamp(date.atStartOfDay(ZoneOffset.UTC)
+                                            .format(java.time.format.DateTimeFormatter.ISO_INSTANT)))
             ));
 
             docs.documents().batchUpdate(doc.id(),
                     new BatchUpdateDocumentRequest().setRequests(requests)).execute();
 
-            log.debug("Appended agenda for {} to document {}", date, doc.id());
+            log.debug("Appended agenda for {} ({}) to document {}", meetingName, date, doc.id());
 
         } catch (IOException | GeneralSecurityException e) {
             throw new RuntimeException("Failed to append agenda to document '" + doc.id() + "': " + e.getMessage(), e);
         }
+    }
+
+    private static List<Request> buildHeadingStyleRequests(String text, int insertAt) {
+        List<Request> requests = new ArrayList<>();
+        int charPos = insertAt;
+        for (String line : text.split("\n", -1)) {
+            int lineStart = charPos;
+            int lineEnd = charPos + line.length() + 1;
+
+            String style = null;
+            if (line.startsWith("> ") && !line.startsWith(">> ")) {
+                style = "HEADING_2";
+            } else if (line.startsWith(">> ")) {
+                style = "HEADING_3";
+            }
+
+            if (style != null) {
+                requests.add(new Request().setUpdateParagraphStyle(
+                        new UpdateParagraphStyleRequest()
+                                .setRange(new Range().setStartIndex(lineStart).setEndIndex(lineEnd))
+                                .setParagraphStyle(new ParagraphStyle().setNamedStyleType(style))
+                                .setFields("namedStyleType")
+                ));
+            }
+            charPos = lineEnd;
+        }
+        return requests;
     }
 
     /** Navigates Drive folder hierarchy and returns the ID of the deepest folder, or null if not found. */

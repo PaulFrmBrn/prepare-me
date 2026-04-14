@@ -5,6 +5,7 @@ import com.paulfrmbrn.domain.model.DocRef;
 import com.paulfrmbrn.domain.model.Meeting;
 import com.paulfrmbrn.domain.model.MeetingType;
 import com.paulfrmbrn.domain.model.MeetingWithTopics;
+import com.paulfrmbrn.domain.model.Topic;
 import com.paulfrmbrn.domain.port.out.CalendarPort;
 import com.paulfrmbrn.domain.port.out.ManualLinkResolverPort;
 import com.paulfrmbrn.domain.port.out.MeetingBoardPort;
@@ -45,12 +46,14 @@ class PrepareMeetingNotesTest {
 
     @Test
     void oneOnOneMeeting_buildsPathFromNotesDirAndAppendsAgenda() {
+        var topics = List.of(new Topic("topic1", List.of()), new Topic("topic2", List.of()));
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
-                new MeetingWithTopics("Meeting: Ivan / Dima", List.of("topic1", "topic2"))
+                new MeetingWithTopics("Meeting: Ivan / Dima", topics)
         ));
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Ivan / Dima", List.of("ivan@example.com", "dima@example.com"))
         ));
+        when(resolver.resolveDocName("Ivan / Dima")).thenThrow(new MissingDocMappingException("Ivan / Dima"));
         var docRef = new DocRef("doc1", "https://docs.google.com/doc1");
         when(notes.findDoc("_Notes/People/Ivan")).thenReturn(Optional.of(docRef));
 
@@ -58,8 +61,25 @@ class PrepareMeetingNotesTest {
 
         assertThat(result).containsExactly(Map.entry("Ivan / Dima", "https://docs.google.com/doc1"));
         verify(notes).findDoc("_Notes/People/Ivan");
-        verify(notes).appendAgenda(docRef, DATE, List.of("topic1", "topic2"));
-        verifyNoInteractions(resolver);
+        verify(notes).appendAgenda(docRef, DATE, "Ivan / Dima", topics);
+    }
+
+    @Test
+    void oneOnOneMeeting_withDocMapping_usesDocMappingPath() {
+        when(board.getMeetingsWithTopics()).thenReturn(List.of(
+                new MeetingWithTopics("Meeting: Ivan / Dima", List.of())
+        ));
+        when(calendar.getMeetings(DATE)).thenReturn(List.of(
+                new Meeting("Ivan / Dima", List.of("ivan@example.com", "dima@example.com"))
+        ));
+        when(resolver.resolveDocName("Ivan / Dima")).thenReturn("_Notes/Custom/Ivan override");
+        var docRef = new DocRef("doc1", "https://docs.google.com/doc1");
+        when(notes.findDoc("_Notes/Custom/Ivan override")).thenReturn(Optional.of(docRef));
+
+        var result = useCase.execute(DATE);
+
+        assertThat(result).containsExactly(Map.entry("Ivan / Dima", "https://docs.google.com/doc1"));
+        verify(notes).findDoc("_Notes/Custom/Ivan override");
     }
 
     @Test
@@ -70,6 +90,7 @@ class PrepareMeetingNotesTest {
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Dmitry / Maria", List.of("dmitry@example.com", "maria@example.com"))
         ));
+        when(resolver.resolveDocName("Dmitry / Maria")).thenThrow(new MissingDocMappingException("Dmitry / Maria"));
         var docRef = new DocRef("doc2", "https://docs.google.com/doc2");
         when(notes.findDoc("_Notes/People/Maria")).thenReturn(Optional.of(docRef));
 
@@ -81,8 +102,9 @@ class PrepareMeetingNotesTest {
 
     @Test
     void groupMeeting_usesResolverPathAndFindsDoc() {
+        var topics = List.of(new Topic("action items", List.of()));
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
-                new MeetingWithTopics("Meeting: Weekly Sync", List.of("action items"))
+                new MeetingWithTopics("Meeting: Weekly Sync", topics)
         ));
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Weekly Sync", List.of("a@x.com", "b@x.com", "c@x.com"))
@@ -96,7 +118,7 @@ class PrepareMeetingNotesTest {
         assertThat(result).containsExactly(Map.entry("Weekly Sync", "https://docs.google.com/doc3"));
         verify(resolver).resolveDocName("Weekly Sync");
         verify(notes).findDoc("_Notes/Teams/Platform Team");
-        verify(notes).appendAgenda(docRef, DATE, List.of("action items"));
+        verify(notes).appendAgenda(docRef, DATE, "Weekly Sync", topics);
     }
 
     @Test
@@ -118,22 +140,25 @@ class PrepareMeetingNotesTest {
 
     @Test
     void skipsAndContinuesWhenDocMappingMissing() {
+        var topicItem = new Topic("item", List.of());
+        var topicTopic = new Topic("topic", List.of());
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
-                new MeetingWithTopics("Meeting: Weekly Sync", List.of("item")),
-                new MeetingWithTopics("Meeting: Ivan / Dima", List.of("topic"))
+                new MeetingWithTopics("Meeting: Weekly Sync", List.of(topicItem)),
+                new MeetingWithTopics("Meeting: Ivan / Dima", List.of(topicTopic))
         ));
         when(calendar.getMeetings(DATE)).thenReturn(List.of(
                 new Meeting("Weekly Sync", List.of("a@x.com", "b@x.com", "c@x.com")),
                 new Meeting("Ivan / Dima", List.of("ivan@x.com", "dima@x.com"))
         ));
         when(resolver.resolveDocName("Weekly Sync")).thenThrow(new MissingDocMappingException("Weekly Sync"));
+        when(resolver.resolveDocName("Ivan / Dima")).thenThrow(new MissingDocMappingException("Ivan / Dima"));
         var docRef = new DocRef("doc4", "https://docs.google.com/doc4");
         when(notes.findDoc("_Notes/People/Ivan")).thenReturn(Optional.of(docRef));
 
         var result = useCase.execute(DATE);
 
         assertThat(result).containsExactly(Map.entry("Ivan / Dima", "https://docs.google.com/doc4"));
-        verify(notes, never()).appendAgenda(any(), any(), eq(List.of("item")));
+        verify(notes, never()).appendAgenda(any(), any(), any(), eq(List.of(topicItem)));
     }
 
     @Test

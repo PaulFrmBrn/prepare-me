@@ -1,6 +1,7 @@
 package com.paulfrmbrn.domain.port.out;
 
 import com.paulfrmbrn.domain.model.DocRef;
+import com.paulfrmbrn.domain.model.Topic;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -8,5 +9,5 @@ import java.util.Optional;
 
 public interface MeetingNotesPort {
     Optional<DocRef> findDoc(String drivePath);
-    void appendAgenda(DocRef doc, LocalDate date, List<String> topics);
+    void appendAgenda(DocRef doc, LocalDate date, String meetingName, List<Topic> topics);
 }

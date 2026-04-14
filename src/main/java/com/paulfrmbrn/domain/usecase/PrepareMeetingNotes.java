@@ -21,13 +21,95 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * Orchestrates the <em>create-agenda</em> phase (phase 2) of the meeting-preparation workflow.
+ *
+ * <h2>Purpose</h2>
+ * <p>For each meeting on the Trello board's Meetings list, this use case locates the
+ * corresponding notes document in Google Drive and appends a dated agenda section populated
+ * with topic entries from the board.  It is intended to be run on the day of the meetings,
+ * after {@code draft-plan} (phase 1) has already created the meeting and topic cards.</p>
+ *
+ * <h2>Input</h2>
+ * <ul>
+ *   <li>{@code date} – the calendar date for which to fetch meetings and append the agenda
+ *       heading.  Typically "today", but can be any date when using {@code --date}.</li>
+ * </ul>
+ *
+ * <h2>Output</h2>
+ * <p>An ordered {@code Map<meetingTitle, documentUrl>} for every meeting that was successfully
+ * processed (document found and agenda appended).  The order matches the card order on the board.</p>
+ *
+ * <h2>Meeting-type classification</h2>
+ * <p>Each Trello card's title is stripped of the {@code "Meeting: "} prefix and compared
+ * against a regex pattern {@code <Name> / Dima|Dmitry|Dmitrii} (both orderings).  If the
+ * title matches <em>and</em> Google Calendar confirms at most two attendees, the meeting is
+ * classified as {@code ONE_ON_ONE}; otherwise it is {@code GROUP}.</p>
+ *
+ * <h2>Drive path resolution</h2>
+ * <ul>
+ *   <li><strong>ONE_ON_ONE</strong> – path is built as {@code {notesDir}/People/{otherPersonName}},
+ *       where {@code otherPersonName} is the non-Dima/Dmitry participant extracted from the title.</li>
+ *   <li><strong>GROUP</strong> – path is resolved via {@link ManualLinkResolverPort}, which looks up
+ *       the meeting title in the {@code docMappings} section of {@code settings.yaml}.
+ *       If no entry exists, a {@link com.paulfrmbrn.adapter.out.mapping.MissingDocMappingException}
+ *       is thrown, the meeting is skipped with a console message, and processing continues
+ *       with the next meeting.</li>
+ * </ul>
+ *
+ * <h2>Topic enrichment and agenda format</h2>
+ * <p>Each topic card on the board carries zero or more Trello checklists, each with zero or
+ * more checklist items.  The agenda section appended to Google Docs is formatted by
+ * {@link AgendaFormatter} as plain text with the following rules:</p>
+ * <ul>
+ *   <li>The date is written as a {@code HEADING_1} line ({@code yyyy-MM-dd}).</li>
+ *   <li>Each topic starts with {@code "> <topic name>"}.</li>
+ *   <li>If the topic has <strong>no checklists</strong>: a {@code <notes></notes>} placeholder
+ *       is added directly below the topic line.</li>
+ *   <li>If there is exactly <strong>one checklist named "Checklist"</strong>: the {@code ">> Checklist"}
+ *       header is omitted; only the last unchecked item and {@code <notes></notes>} block are written.</li>
+ *   <li>Otherwise, each checklist is written as {@code ">> <checklist name>"} followed by
+ *       the last unchecked item (or {@code "- no items"} if all items are complete) and a
+ *       {@code <notes></notes>} block.</li>
+ *   <li>"Last unchecked item" is the item with the highest {@code pos} value among all
+ *       {@code incomplete} items in that checklist.</li>
+ * </ul>
+ * <pre>
+ * 2026-04-15                     ← HEADING_1 in Google Docs
+ * &gt; Deploy                       ← topic with no checklists
+ * &lt;notes&gt;
+ * &lt;/notes&gt;
+ * &gt; Fix regression               ← topic with single "Checklist" checklist
+ * - Write failing test
+ * &lt;notes&gt;
+ * &lt;/notes&gt;
+ * &gt; Sprint planning              ← topic with named checklists
+ * &gt;&gt; Prep
+ * - Book room
+ * &lt;notes&gt;
+ * &lt;/notes&gt;
+ * &gt;&gt; Goals
+ * - no items
+ * &lt;notes&gt;
+ * &lt;/notes&gt;
+ * </pre>
+ *
+ * <h2>Error handling</h2>
+ * <ul>
+ *   <li>If the Drive document is not found for a resolved path, a warning is logged and the
+ *       meeting is silently skipped (no entry in the result map).</li>
+ *   <li>Missing {@code docMappings} entries print a console hint and skip the meeting.</li>
+ *   <li>I/O failures from ports propagate as runtime exceptions.</li>
+ * </ul>
+ */
 public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PrepareMeetingNotes.class);
 
     // Matches "Name / Dima", "Dima / Name", "Name / Dmitry", etc.
+    // [^/]+ ensures the other person's name contains no "/" so "A / B / Dmitry" is not matched.
     private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^(.+?) / (Dima|Dmitry|Dmitrii)$|^(Dima|Dmitry|Dmitrii) / (.+?)$");
+            Pattern.compile("^([^/]+) / (Dima|Dmitry|Dmitrii)$|^(Dima|Dmitry|Dmitrii) / ([^/]+)$");
 
     private final MeetingBoardPort board;
     private final CalendarPort calendar;
@@ -69,13 +151,13 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
             log.debug("Meeting '{}' detected as {}", eventTitle, type);
 
             String drivePath;
-            if (type == MeetingType.ONE_ON_ONE) {
-                String personName = extractOtherPersonName(eventTitle);
-                drivePath = notesDir + "/People/" + personName;
-            } else {
-                try {
-                    drivePath = resolver.resolveDocName(eventTitle);
-                } catch (MissingDocMappingException e) {
+            try {
+                drivePath = resolver.resolveDocName(eventTitle);
+            } catch (MissingDocMappingException e) {
+                if (type == MeetingType.ONE_ON_ONE) {
+                    String personName = extractOtherPersonName(eventTitle);
+                    drivePath = notesDir + "/People/" + personName;
+                } else {
                     System.out.println("Skipped: " + e.getMessage());
                     continue;
                 }
@@ -88,7 +170,7 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
                 continue;
             }
 
-            notes.appendAgenda(docRef.get(), date, meetingCard.topics());
+            notes.appendAgenda(docRef.get(), date, eventTitle, meetingCard.topics());
             result.put(eventTitle, docRef.get().url());
         }
 
