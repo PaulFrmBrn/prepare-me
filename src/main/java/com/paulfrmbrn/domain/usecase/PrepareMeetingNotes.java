@@ -106,10 +106,12 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PrepareMeetingNotes.class);
 
-    // Matches "Name / Dima", "Dima / Name", "Name / Dmitry", etc.
-    // [^/]+ ensures the other person's name contains no "/" so "A / B / Dmitry" is not matched.
+    // Matches "Name / Dima", "Prefix Name / Dima", "Name / Dima suffix", etc.
+    // Optional prefix (e.g. ticket id "ODM-12259. ") and suffix (e.g. " - milestone 3") are allowed.
+    // [^/] in the prefix part ensures titles with multiple "/" (e.g. "A / B / Dmitry") are not matched.
     private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^([^/]+) / (Dima|Dmitry|Dmitrii)$|^(Dima|Dmitry|Dmitrii) / ([^/]+)$");
+            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+) / (Dima|Dmitry|Dmitrii)(?:\\s.*)?$" +
+                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii) / ([A-Za-z]+)(?:\\s.*)?$");
 
     private final MeetingBoardPort board;
     private final CalendarPort calendar;

@@ -11,7 +11,7 @@ A calendar event that requires preparation. Not all calendar events are meetings
 
 **MeetingType**
 Classifies a meeting for the purpose of locating its notes document.
-- `ONE_ON_ONE` — exactly 2 attendees (the user + one other person). Identified by the title pattern `<OtherName> / <UserName>` where the user's name may appear as *Dima*, *Dmitry*, or *Dmitrii*.
+- `ONE_ON_ONE` — exactly 2 attendees (the user + one other person). Identified by the title pattern `<OtherName> / <UserName>` where the user's name may appear as *Dima*, *Dmitry*, or *Dmitrii*. The title may also include an optional prefix (e.g. a ticket id or chat label) and/or an optional suffix (e.g. a milestone description): `ODM-12259. Mikhail / Dmitry`, `Ivan / Dmitry - milestone 3`, `Random chat 2 - Gleb / Dmitry`.
 - `GROUP` — 3 or more attendees, or any event that does not match the 1-1 title pattern.
 
 **TopicCard**
@@ -62,7 +62,7 @@ Resolves a notes document name for a meeting when automatic lookup fails. First 
 | Pattern | Example | Meaning |
 |---|---|---|
 | Planner card name | `Meeting: Weekly Sync` | Created by `draft-plan`; marks a meeting in the Planner |
-| 1-1 event title | `Ivan / Dima` | User and other person separated by ` / `; either order |
+| 1-1 event title | `Ivan / Dima`, `ODM-12259. Mikhail / Dmitry`, `Ivan / Dmitry - milestone 3`, `Random chat 2 - Gleb / Dmitry` | User and other person separated by ` / `; either order; optional prefix/suffix allowed |
 | Notes folder (1-1) | `_Notes/People` | Root-level Google Drive folder for 1-1 note documents |
 | Notes folder (group) | `_Notes/Teams` | Root-level Google Drive folder for group/team note documents |
 | Notes doc title | `Ivan` / `Иван` / `Ваня` | Named after the person or team; Latin or Cyrillic |

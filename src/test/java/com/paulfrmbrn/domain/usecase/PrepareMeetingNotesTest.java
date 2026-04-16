@@ -186,4 +186,19 @@ class PrepareMeetingNotesTest {
     void extractOtherPersonName_dmitriiVariant() {
         assertThat(useCase.extractOtherPersonName("Dmitrii / Olga")).isEqualTo("Olga");
     }
+
+    @Test
+    void extractOtherPersonName_withTicketPrefix() {
+        assertThat(useCase.extractOtherPersonName("ODM-12259. Mikhail / Dmitry")).isEqualTo("Mikhail");
+    }
+
+    @Test
+    void extractOtherPersonName_withMilestoneSuffix() {
+        assertThat(useCase.extractOtherPersonName("Ivan / Dmitry - milestone 3")).isEqualTo("Ivan");
+    }
+
+    @Test
+    void extractOtherPersonName_withChatPrefix() {
+        assertThat(useCase.extractOtherPersonName("Random chat 2 - Gleb / Dmitry")).isEqualTo("Gleb");
+    }
 }

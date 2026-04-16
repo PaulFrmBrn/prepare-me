@@ -76,15 +76,43 @@ gradle wrapper        # only needed once if ./gradlew doesn't exist yet
 
 ## Usage
 
-```bash
-# Create meeting cards for today
-build/install/prepare-me/bin/prepare-me draft-plan --date 2026-04-14
+### Phase 1 — Draft Plan
 
-# After adding topic cards manually in Trello:
-build/install/prepare-me/bin/prepare-me create-agenda --date 2026-04-14
+Pulls today's meetings from Google Calendar and creates a Trello card for each one in the Meetings list.
+
+```bash
+./gradlew run --args="draft-plan"           # today
+./gradlew run --args="draft-plan --date 2026-04-14"   # specific date
 ```
 
-Run `./gradlew installDist` again whenever you rebuild after a code change.
+The Meetings list must be empty before running — clear it manually if it still has cards from the previous day.
+
+### Phase 1.5 — Add Topics (manual)
+
+Open Trello. Below each meeting card, add topic cards — one per topic you want to discuss. Reorder cards as needed. Each topic card can have Trello checklists; `create-agenda` will pick up the first unchecked item per checklist.
+
+### Phase 2 — Create Agenda
+
+Reads the Meetings list from Trello, finds the Google Doc for each meeting, and appends a dated agenda section with the topics and checklist items.
+
+```bash
+./gradlew run --args="create-agenda"           # today
+./gradlew run --args="create-agenda --date 2026-04-14"   # specific date
+```
+
+The command prints a numbered list of Google Doc links — one per processed meeting — ready to open before each call.
+
+Group meetings that are not yet in `docMappings` in `~/.prepare-me/settings.yaml` are skipped with a message showing the exact entry to add.
+
+---
+
+> **Tip:** use the installed binary instead of `./gradlew run` once you have a stable build:
+> ```bash
+> ./gradlew installDist
+> build/install/prepare-me/bin/prepare-me draft-plan
+> build/install/prepare-me/bin/prepare-me create-agenda
+> ```
+> Re-run `./gradlew installDist` after any code change.
 
 On the first run a browser tab will open for Google OAuth — approve it and the token is saved to `~/.prepare-me/tokens/` and reused on every subsequent run.
 
