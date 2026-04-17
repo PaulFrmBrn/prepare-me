@@ -5,7 +5,6 @@ import com.paulfrmbrn.domain.model.MeetingWithTopics;
 import java.util.List;
 
 public interface MeetingBoardPort {
-    boolean isMeetingListEmpty();
     void createCard(String name);
     List<MeetingWithTopics> getMeetingsWithTopics();
 }

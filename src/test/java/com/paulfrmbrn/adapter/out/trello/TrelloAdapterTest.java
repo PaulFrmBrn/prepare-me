@@ -99,38 +99,6 @@ class TrelloAdapterTest {
         verify(http, times(1)).send(argThat(r -> r.uri().toString().contains("/boards/board1/lists")), any());
     }
 
-    @Test
-    void isMeetingListEmpty_returnsTrueWhenNoCards() throws Exception {
-        when(http.send(any(HttpRequest.class), any())).thenAnswer(inv -> {
-            HttpRequest req = inv.getArgument(0);
-            String url = req.uri().toString();
-            if (url.contains("/members/me/boards"))
-                return responseWith(200, "[{\"id\":\"board1\",\"name\":\"work\"}]");
-            if (url.contains("/boards/board1/lists"))
-                return responseWith(200, "[{\"id\":\"list1\",\"name\":\"Meetings\"}]");
-            return responseWith(200, "[]");
-        });
-
-        var adapter = new TrelloAdapter("key", "token", "work", "Meetings", http);
-        assertThat(adapter.isMeetingListEmpty()).isTrue();
-    }
-
-    @Test
-    void isMeetingListEmpty_returnsFalseWhenCardsExist() throws Exception {
-        when(http.send(any(HttpRequest.class), any())).thenAnswer(inv -> {
-            HttpRequest req = inv.getArgument(0);
-            String url = req.uri().toString();
-            if (url.contains("/members/me/boards"))
-                return responseWith(200, "[{\"id\":\"board1\",\"name\":\"work\"}]");
-            if (url.contains("/boards/board1/lists"))
-                return responseWith(200, "[{\"id\":\"list1\",\"name\":\"Meetings\"}]");
-            return responseWith(200, "[{\"id\":\"card1\"}]");
-        });
-
-        var adapter = new TrelloAdapter("key", "token", "work", "Meetings", http);
-        assertThat(adapter.isMeetingListEmpty()).isFalse();
-    }
-
     @SuppressWarnings("unchecked")
     private HttpResponse<String> responseWith(int status, String body) {
         HttpResponse<String> r = mock(HttpResponse.class);

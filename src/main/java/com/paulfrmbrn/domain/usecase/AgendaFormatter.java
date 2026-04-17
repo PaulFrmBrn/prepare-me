@@ -14,7 +14,6 @@ public class AgendaFormatter {
         sb.append("\n ").append(meetingName).append("\n");
         if (topics.isEmpty()) {
             sb.append("> No topics\n");
-            appendNotesBlock(sb);
         } else {
             for (Topic topic : topics) {
                 formatTopic(sb, topic);
@@ -29,25 +28,16 @@ public class AgendaFormatter {
         List<Checklist> checklists = topic.checklists();
         boolean singleDefaultChecklist = checklists.size() == 1 && "Checklist".equals(checklists.get(0).name());
 
-        if (checklists.isEmpty()) {
-            appendNotesBlock(sb);
-        } else if (singleDefaultChecklist) {
-            appendChecklistContent(sb, checklists.get(0));
+        if (singleDefaultChecklist) {
+            checklists.get(0).lastUncheckedItemName()
+                    .ifPresent(item -> sb.append(item).append("\n"));
         } else {
             for (Checklist checklist : checklists) {
-                sb.append(">> ").append(checklist.name()).append("\n");
-                appendChecklistContent(sb, checklist);
+                checklist.lastUncheckedItemName().ifPresent(item -> {
+                    sb.append(">> ").append(checklist.name()).append("\n");
+                    sb.append(item).append("\n");
+                });
             }
         }
-    }
-
-    private static void appendChecklistContent(StringBuilder sb, Checklist checklist) {
-        String item = checklist.lastUncheckedItemName().orElse(null);
-        sb.append(item != null ? item : "no items").append("\n");
-        appendNotesBlock(sb);
-    }
-
-    private static void appendNotesBlock(StringBuilder sb) {
-        sb.append("n>\n<n\n");
     }
 }

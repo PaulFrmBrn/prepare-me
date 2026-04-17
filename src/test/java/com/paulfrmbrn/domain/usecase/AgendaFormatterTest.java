@@ -14,14 +14,12 @@ class AgendaFormatterTest {
     static final String MEETING = "Team Sync";
 
     @Test
-    void topicWithNoChecklists_writesTopicLineAndNotesBlock() {
+    void topicWithNoChecklists_writesTopicLine() {
         var result = AgendaFormatter.format(MEETING, List.of(new Topic("Deploy", List.of())));
         assertThat(result).isEqualTo("""
 
                  Team Sync
                 > Deploy
-                n>
-                <n
                 """);
     }
 
@@ -34,22 +32,17 @@ class AgendaFormatterTest {
                  Team Sync
                 > Bug fix
                 Fix tests
-                n>
-                <n
                 """);
     }
 
     @Test
-    void singleChecklistNamedChecklist_allItemsChecked_writesNoItems() {
+    void singleChecklistNamedChecklist_allItemsChecked_omitsChecklist() {
         var checklist = new Checklist("Checklist", Optional.empty());
         var result = AgendaFormatter.format(MEETING, List.of(new Topic("Bug fix", List.of(checklist))));
         assertThat(result).isEqualTo("""
 
                  Team Sync
                 > Bug fix
-                no items
-                n>
-                <n
                 """);
     }
 
@@ -63,28 +56,22 @@ class AgendaFormatterTest {
                 > Sprint planning
                 >> Prep
                 Slide deck
-                n>
-                <n
                 """);
     }
 
     @Test
-    void singleNamedChecklist_noUncheckedItems_writesNoItems() {
+    void singleNamedChecklist_noUncheckedItems_omitsChecklist() {
         var checklist = new Checklist("Prep", Optional.empty());
         var result = AgendaFormatter.format(MEETING, List.of(new Topic("Sprint planning", List.of(checklist))));
         assertThat(result).isEqualTo("""
 
                  Team Sync
                 > Sprint planning
-                >> Prep
-                no items
-                n>
-                <n
                 """);
     }
 
     @Test
-    void multipleChecklists_writesAllHeaders() {
+    void multipleChecklists_skipsChecklistsWithNoUncheckedItems() {
         var cl1 = new Checklist("Prep", Optional.of("Book room"));
         var cl2 = new Checklist("Goals", Optional.empty());
         var result = AgendaFormatter.format(MEETING, List.of(new Topic("Sprint planning", List.of(cl1, cl2))));
@@ -94,12 +81,6 @@ class AgendaFormatterTest {
                 > Sprint planning
                 >> Prep
                 Book room
-                n>
-                <n
-                >> Goals
-                no items
-                n>
-                <n
                 """);
     }
 
@@ -113,24 +94,18 @@ class AgendaFormatterTest {
 
                  Team Sync
                 > Deploy
-                n>
-                <n
                 > Review
                 Read PR
-                n>
-                <n
                 """);
     }
 
     @Test
-    void emptyTopicList_writesNoTopicsAndNotesBlock() {
+    void emptyTopicList_writesNoTopics() {
         var result = AgendaFormatter.format(MEETING, List.of());
         assertThat(result).isEqualTo("""
 
                  Team Sync
                 > No topics
-                n>
-                <n
                 """);
     }
 }
