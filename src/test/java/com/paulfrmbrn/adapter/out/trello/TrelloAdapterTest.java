@@ -99,6 +99,36 @@ class TrelloAdapterTest {
         verify(http, times(1)).send(argThat(r -> r.uri().toString().contains("/boards/board1/lists")), any());
     }
 
+    @Test
+    void addTopicComment_postsCommentToCard() throws Exception {
+        when(http.send(any(HttpRequest.class), any())).thenAnswer(inv -> {
+            HttpRequest req = inv.getArgument(0);
+            if (req.uri().toString().contains("/actions/comments"))
+                return responseWith(200, "{\"id\":\"comment1\"}");
+            return responseWith(404, "not found");
+        });
+
+        var adapter = new TrelloAdapter("key", "token", "work", "Meetings", http);
+        adapter.addTopicComment("card123", "my notes here"); // should not throw
+
+        verify(http).send(argThat(r ->
+                r.uri().toString().contains("/cards/card123/actions/comments")
+                        && r.method().equals("POST")
+        ), any());
+    }
+
+    @Test
+    void addTopicComment_throwsOnNon200() throws Exception {
+        doReturn(responseWith(401, "unauthorized"))
+                .when(http).send(any(HttpRequest.class), any());
+
+        var adapter = new TrelloAdapter("key", "token", "work", "Meetings", http);
+
+        assertThatThrownBy(() -> adapter.addTopicComment("card123", "notes"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("401");
+    }
+
     @SuppressWarnings("unchecked")
     private HttpResponse<String> responseWith(int status, String body) {
         HttpResponse<String> r = mock(HttpResponse.class);

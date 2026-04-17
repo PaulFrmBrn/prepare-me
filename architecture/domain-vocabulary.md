@@ -15,7 +15,10 @@ Classifies a meeting for the purpose of locating its notes document.
 - `GROUP` — 3 or more attendees, or any event that does not match the 1-1 title pattern.
 
 **TopicCard**
-An agenda item the user wants to cover in a meeting. Topic cards are created manually in the Planner (Add Topics step) and are positioned below the meeting's Planner card. The ordered list of topic cards under a meeting card forms its agenda.
+An agenda item the user wants to cover in a meeting. Topic cards are created manually in the Planner (Add Topics step) and are positioned below the meeting's Planner card. The ordered list of topic cards under a meeting card forms its agenda. Each topic card carries a board-side `id` used to post comments (Save Notes phase).
+
+**TopicContent**
+A topic section read back from a notes document: `topicName` (matches the Trello topic card name) and `bodyText` (all content beneath the topic heading — checklist item lines and free-text notes the user wrote — excluding the heading line itself).
 
 **Agenda**
 The ordered list of TopicCards for a single meeting. Written into the meeting's notes document during Create Agenda.
@@ -33,6 +36,12 @@ The manual step between Draft Plan and Create Agenda: the user reorders Planner 
 **Create Agenda**
 The automated step (`create-agenda` command) that reads the ordered Planner cards (meetings + their topic cards), locates or receives the notes document for each meeting, and appends a dated heading with the agenda topics.
 
+**Fill in Notes**
+The manual step between Create Agenda and Save Notes: the user opens each meeting's notes document and writes text freely under each topic heading (decisions, action items, context). No special markup or placeholders are required. Not automated.
+
+**Save Notes**
+The automated step (`save-notes` command) that reads back each meeting's notes document, extracts all content beneath each topic heading (checklist item lines and any free text the user wrote — everything except the topic heading line itself), and posts it as a comment on the corresponding Trello topic card.
+
 ---
 
 ## Ports (Domain Boundaries)
@@ -42,14 +51,16 @@ Provides filtered meetings for a given date. Hides the calendar provider (curren
 - `List<Meeting> getMeetings(LocalDate date)`
 
 **MeetingBoardPort**
-Creates meeting cards and reads the ordered card list with grouped topics. Hides the planning tool (currently Trello).
+Creates meeting cards, reads the ordered card list with grouped topics, and posts comments on topic cards. Hides the planning tool (currently Trello).
 - `void createCard(String name)` — used by Draft Plan
-- `List<MeetingWithTopics> getMeetingsWithTopics()` — used by Create Agenda
+- `List<MeetingWithTopics> getMeetingsWithTopics()` — used by Create Agenda and Save Notes
+- `void addTopicComment(String topicId, String comment)` — used by Save Notes
 
 **MeetingNotesPort**
-Locates a notes document by person/team name and appends a dated agenda. Hides the notes storage (currently Google Drive + Docs).
-- `Optional<DocRef> findDoc(String name, MeetingType type)`
-- `void appendAgenda(DocRef doc, LocalDate date, List<String> topics)`
+Locates a notes document by person/team name, appends a dated agenda, and reads back topic content. Hides the notes storage (currently Google Drive + Docs).
+- `Optional<DocRef> findDoc(String drivePath)`
+- `void appendAgenda(DocRef doc, LocalDate date, String meetingName, List<Topic> topics)`
+- `List<TopicContent> readTopicNotes(DocRef doc, LocalDate date, String meetingName)` — used by Save Notes; returns one `TopicContent` per agenda topic that has non-empty body content
 
 **ManualLinkResolverPort**
 Resolves a notes document name for a meeting when automatic lookup fails. First checks a local mapping file (`~/.prepare-me/doc-mappings.yaml`); if no entry is found, prompts the user to type the document name (not a URL) and persists the new mapping for future runs. Hides the I/O mechanism and local storage (currently stdin/stdout + YAML file).

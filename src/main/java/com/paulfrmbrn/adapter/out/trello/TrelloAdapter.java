@@ -95,6 +95,7 @@ public class TrelloAdapter implements MeetingBoardPort {
     }
 
     private Topic parseTopicCard(JsonNode card) {
+        String id = card.get("id").asText();
         String name = card.get("name").asText();
         List<Checklist> checklists = new ArrayList<>();
 
@@ -107,7 +108,29 @@ public class TrelloAdapter implements MeetingBoardPort {
             }
         }
 
-        return new Topic(name, List.copyOf(checklists));
+        return new Topic(id, name, List.copyOf(checklists));
+    }
+
+    @Override
+    public void addTopicComment(String topicId, String comment) {
+        try {
+            String body = MAPPER.writeValueAsString(Map.of(
+                    "text", comment,
+                    "key", apiKey,
+                    "token", apiToken
+            ));
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE + "/cards/" + topicId + "/actions/comments"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Trello comment creation failed (" + response.statusCode() + "): " + response.body());
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Failed to add Trello comment: " + e.getMessage(), e);
+        }
     }
 
     private Optional<String> findFirstUncheckedItem(JsonNode items) {

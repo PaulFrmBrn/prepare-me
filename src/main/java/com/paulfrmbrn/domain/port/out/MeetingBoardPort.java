@@ -7,4 +7,5 @@ import java.util.List;
 public interface MeetingBoardPort {
     void createCard(String name);
     List<MeetingWithTopics> getMeetingsWithTopics();
+    void addTopicComment(String topicId, String comment);
 }

@@ -34,11 +34,11 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
                 return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
             return response("""
                     [
-                      {"name":"Meeting: Ivan / Dima","checklists":[]},
-                      {"name":"1:1 check-in","checklists":[]},
-                      {"name":"performance review","checklists":[]},
-                      {"name":"Meeting: Weekly Sync","checklists":[]},
-                      {"name":"sprint planning","checklists":[]}
+                      {"id":"m1","name":"Meeting: Ivan / Dima","checklists":[]},
+                      {"id":"c1","name":"1:1 check-in","checklists":[]},
+                      {"id":"c2","name":"performance review","checklists":[]},
+                      {"id":"m2","name":"Meeting: Weekly Sync","checklists":[]},
+                      {"id":"c3","name":"sprint planning","checklists":[]}
                     ]
                     """);
         });
@@ -49,11 +49,11 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).name()).isEqualTo("Meeting: Ivan / Dima");
         assertThat(result.get(0).topics()).containsExactly(
-                new Topic("1:1 check-in", List.of()),
-                new Topic("performance review", List.of())
+                new Topic("c1", "1:1 check-in", List.of()),
+                new Topic("c2", "performance review", List.of())
         );
         assertThat(result.get(1).name()).isEqualTo("Meeting: Weekly Sync");
-        assertThat(result.get(1).topics()).containsExactly(new Topic("sprint planning", List.of()));
+        assertThat(result.get(1).topics()).containsExactly(new Topic("c3", "sprint planning", List.of()));
     }
 
     @Test
@@ -67,8 +67,8 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
                 return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
             return response("""
                     [
-                      {"name":"Meeting: Standup","checklists":[]},
-                      {"name":"Meeting: 1:1 with Bob","checklists":[]}
+                      {"id":"m1","name":"Meeting: Standup","checklists":[]},
+                      {"id":"m2","name":"Meeting: 1:1 with Bob","checklists":[]}
                     ]
                     """);
         });
@@ -108,8 +108,8 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
                 return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
             return response("""
                     [
-                      {"name":"Meeting: Standup","checklists":[]},
-                      {"name":"Deploy","checklists":[
+                      {"id":"m1","name":"Meeting: Standup","checklists":[]},
+                      {"id":"d1","name":"Deploy","checklists":[
                         {"name":"Prep","checkItems":[
                           {"name":"Run tests","state":"complete","pos":1000},
                           {"name":"Notify team","state":"incomplete","pos":2000},
@@ -127,6 +127,7 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
         List<Topic> topics = result.get(0).topics();
         assertThat(topics).hasSize(1);
         Topic topic = topics.get(0);
+        assertThat(topic.id()).isEqualTo("d1");
         assertThat(topic.name()).isEqualTo("Deploy");
         assertThat(topic.checklists()).containsExactly(
                 new Checklist("Prep", Optional.of("Notify team"))
@@ -144,8 +145,8 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
                 return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
             return response("""
                     [
-                      {"name":"Meeting: Standup","checklists":[]},
-                      {"name":"Deploy","checklists":[
+                      {"id":"m1","name":"Meeting: Standup","checklists":[]},
+                      {"id":"d1","name":"Deploy","checklists":[
                         {"name":"Checklist","checkItems":[
                           {"name":"Run tests","state":"complete","pos":1000},
                           {"name":"Notify team","state":"complete","pos":2000}
@@ -175,8 +176,8 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
                 return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
             return response("""
                     [
-                      {"name":"Meeting: Standup","checklists":[]},
-                      {"name":"Quick note","checklists":[]}
+                      {"id":"m1","name":"Meeting: Standup","checklists":[]},
+                      {"id":"n1","name":"Quick note","checklists":[]}
                     ]
                     """);
         });
@@ -185,6 +186,7 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
         var result = adapter.getMeetingsWithTopics();
 
         Topic topic = result.get(0).topics().get(0);
+        assertThat(topic.id()).isEqualTo("n1");
         assertThat(topic.name()).isEqualTo("Quick note");
         assertThat(topic.checklists()).isEmpty();
     }

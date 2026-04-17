@@ -46,7 +46,7 @@ class PrepareMeetingNotesTest {
 
     @Test
     void oneOnOneMeeting_buildsPathFromNotesDirAndAppendsAgenda() {
-        var topics = List.of(new Topic("topic1", List.of()), new Topic("topic2", List.of()));
+        var topics = List.of(new Topic("", "topic1", List.of()), new Topic("", "topic2", List.of()));
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
                 new MeetingWithTopics("Meeting: Ivan / Dima", topics)
         ));
@@ -102,7 +102,7 @@ class PrepareMeetingNotesTest {
 
     @Test
     void groupMeeting_usesResolverPathAndFindsDoc() {
-        var topics = List.of(new Topic("action items", List.of()));
+        var topics = List.of(new Topic("", "action items", List.of()));
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
                 new MeetingWithTopics("Meeting: Weekly Sync", topics)
         ));
@@ -140,8 +140,8 @@ class PrepareMeetingNotesTest {
 
     @Test
     void skipsAndContinuesWhenDocMappingMissing() {
-        var topicItem = new Topic("item", List.of());
-        var topicTopic = new Topic("topic", List.of());
+        var topicItem = new Topic("", "item", List.of());
+        var topicTopic = new Topic("", "topic", List.of());
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
                 new MeetingWithTopics("Meeting: Weekly Sync", List.of(topicItem)),
                 new MeetingWithTopics("Meeting: Ivan / Dima", List.of(topicTopic))

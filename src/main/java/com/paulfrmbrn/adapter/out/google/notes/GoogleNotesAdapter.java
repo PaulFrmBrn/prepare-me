@@ -8,14 +8,17 @@ import com.google.api.services.docs.v1.model.DateElementProperties;
 import com.google.api.services.docs.v1.model.InsertDateRequest;
 import com.google.api.services.docs.v1.model.InsertTextRequest;
 import com.google.api.services.docs.v1.model.Location;
+import com.google.api.services.docs.v1.model.Paragraph;
 import com.google.api.services.docs.v1.model.ParagraphStyle;
 import com.google.api.services.docs.v1.model.Range;
 import com.google.api.services.docs.v1.model.Request;
+import com.google.api.services.docs.v1.model.StructuralElement;
 import com.google.api.services.docs.v1.model.UpdateParagraphStyleRequest;
 import com.google.api.services.drive.Drive;
 import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
 import com.paulfrmbrn.domain.model.DocRef;
 import com.paulfrmbrn.domain.model.Topic;
+import com.paulfrmbrn.domain.model.TopicContent;
 import com.paulfrmbrn.domain.port.out.MeetingNotesPort;
 import com.paulfrmbrn.domain.usecase.AgendaFormatter;
 import org.slf4j.Logger;
@@ -28,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class GoogleNotesAdapter implements MeetingNotesPort {
 
@@ -176,6 +180,96 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
             charPos = lineEnd;
         }
         return requests;
+    }
+
+    /**
+     * Reads topic sections from the meeting's notes document.
+     *
+     * <p>Finds the last HEADING_1 paragraph whose text contains {@code meetingName}, then collects
+     * each subsequent HEADING_2 block (a topic) with all following paragraph text until the next
+     * HEADING_2 or HEADING_1. Only topics with non-empty body text are returned.</p>
+     */
+    @Override
+    public List<TopicContent> readTopicNotes(DocRef doc, LocalDate date, String meetingName) {
+        try {
+            var docs = buildDocs();
+            var document = docs.documents().get(doc.id()).execute();
+            List<StructuralElement> content = document.getBody().getContent();
+            if (content == null) return List.of();
+
+            List<Paragraph> paragraphs = content.stream()
+                    .map(StructuralElement::getParagraph)
+                    .filter(p -> p != null)
+                    .collect(Collectors.toList());
+
+            // Find the last occurrence of a HEADING_1 containing meetingName
+            int meetingHeadingIndex = -1;
+            for (int i = 0; i < paragraphs.size(); i++) {
+                if (isHeading(paragraphs.get(i), "HEADING_1")
+                        && extractText(paragraphs.get(i)).contains(meetingName)) {
+                    meetingHeadingIndex = i;
+                }
+            }
+
+            if (meetingHeadingIndex < 0) {
+                log.warn("Meeting heading '{}' not found in document {}", meetingName, doc.id());
+                return List.of();
+            }
+
+            List<TopicContent> result = new ArrayList<>();
+            String currentTopicName = null;
+            StringBuilder currentBody = new StringBuilder();
+
+            for (int i = meetingHeadingIndex + 1; i < paragraphs.size(); i++) {
+                Paragraph p = paragraphs.get(i);
+                String text = extractText(p).stripTrailing();
+
+                if (isHeading(p, "HEADING_1")) break;  // next meeting section
+
+                if (isTopicHeading(p)) {
+                    if (currentTopicName != null) {
+                        String body = currentBody.toString().stripTrailing();
+                        if (!body.isEmpty()) {
+                            result.add(new TopicContent(currentTopicName, body));
+                        }
+                    }
+                    currentTopicName = text.startsWith("> ") ? text.substring(2) : text;
+                    currentBody = new StringBuilder();
+                } else if (currentTopicName != null && !text.isEmpty()) {
+                    if (currentBody.length() > 0) currentBody.append("\n");
+                    currentBody.append(text);
+                }
+            }
+
+            if (currentTopicName != null) {
+                String body = currentBody.toString().stripTrailing();
+                if (!body.isEmpty()) {
+                    result.add(new TopicContent(currentTopicName, body));
+                }
+            }
+
+            return result;
+
+        } catch (IOException | GeneralSecurityException e) {
+            throw new RuntimeException("Failed to read topic notes from document '" + doc.id() + "': " + e.getMessage(), e);
+        }
+    }
+
+    private static boolean isHeading(Paragraph paragraph, String headingType) {
+        ParagraphStyle style = paragraph.getParagraphStyle();
+        return style != null && headingType.equals(style.getNamedStyleType());
+    }
+
+    private static boolean isTopicHeading(Paragraph paragraph) {
+        return isHeading(paragraph, "HEADING_2") && extractText(paragraph).startsWith("> ");
+    }
+
+    private static String extractText(Paragraph paragraph) {
+        if (paragraph.getElements() == null) return "";
+        return paragraph.getElements().stream()
+                .filter(e -> e.getTextRun() != null)
+                .map(e -> e.getTextRun().getContent())
+                .collect(Collectors.joining());
     }
 
     /** Navigates Drive folder hierarchy and returns the ID of the deepest folder, or null if not found. */
