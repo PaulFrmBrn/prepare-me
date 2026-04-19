@@ -63,7 +63,8 @@ class SaveMeetingNotesTest {
 
         assertThat(result).containsExactly(Map.entry("Ivan / Dima", 1));
         verify(notes).readTopicNotes(docRef, DATE, "Ivan / Dima");
-        verify(board).addTopicComment("t1", "Notify team\nDone");
+        verify(board).addTopicComment("t1",
+                "2026-04-14\n\nNotify team\nDone\n\nhttps://docs.google.com/doc1");
     }
 
     @Test

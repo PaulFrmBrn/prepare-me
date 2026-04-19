@@ -108,7 +108,8 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
                             tc.topicName(), eventTitle);
                     continue;
                 }
-                board.addTopicComment(topicId, tc.bodyText());
+                String comment = date + "\n\n" + tc.bodyText() + "\n\n" + docRef.get().url();
+                board.addTopicComment(topicId, comment);
                 postedCount++;
             }
 
