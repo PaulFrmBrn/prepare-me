@@ -42,3 +42,6 @@ build/
 google-credentials.json
 .tokens/
 settings.yaml
+
+doc-mappings.yaml
+excluded-events.yaml

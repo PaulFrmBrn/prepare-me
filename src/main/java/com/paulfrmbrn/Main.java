@@ -32,10 +32,14 @@ public class Main {
             var plannerAdapter  = new TrelloAdapter(s.trello.apiKey, s.trello.apiToken,
                                                     s.trello.boardName, s.trello.meetingsListName);
             var notesAdapter    = new GoogleNotesAdapter(googleAuth);
-            var resolverAdapter = new ManualDocNameResolverAdapter(s.docMappings);
 
-            var createMeetingCards  = new CreateMeetingCards(calendarAdapter, plannerAdapter,
-                                                              new java.util.HashSet<>(s.excludedEvents));
+            Path docMappingsPath = Path.of(Settings.expand(s.docMappingsFile));
+            var resolverAdapter = new ManualDocNameResolverAdapter(docMappingsPath);
+
+            Path excludedEventsPath = Path.of(Settings.expand(s.excludedEventsFile));
+            var excludedEvents = new java.util.HashSet<>(Settings.loadExcludedEvents(excludedEventsPath));
+
+            var createMeetingCards  = new CreateMeetingCards(calendarAdapter, plannerAdapter, excludedEvents);
             var prepareMeetingNotes = new PrepareMeetingNotes(plannerAdapter, calendarAdapter,
                                                               notesAdapter, resolverAdapter, s.notesDir);
             var saveMeetingNotes    = new SaveMeetingNotes(plannerAdapter, calendarAdapter,

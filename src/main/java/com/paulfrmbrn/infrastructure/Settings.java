@@ -1,5 +1,7 @@
 package com.paulfrmbrn.infrastructure;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
@@ -10,13 +12,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Settings {
 
     public Google google = new Google();
     public Trello trello = new Trello();
     public String notesDir = "_Notes";
-    public List<String> excludedEvents = new ArrayList<>();
-    public Map<String, String> docMappings = new LinkedHashMap<>();
+    public String excludedEventsFile = "~/.prepare-me/excluded-events.yaml";
+    public String docMappingsFile = "~/.prepare-me/doc-mappings.yaml";
 
     public static class Google {
         public String credentialsFile = "~/.prepare-me/google-credentials.json";
@@ -32,6 +35,18 @@ public class Settings {
 
     public static Settings load(Path path) throws IOException {
         return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), Settings.class);
+    }
+
+    /** Loads a YAML list of excluded event names from the given file. Returns empty list if file does not exist. */
+    public static List<String> loadExcludedEvents(Path path) throws IOException {
+        if (!path.toFile().exists()) return new ArrayList<>();
+        return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), new TypeReference<>() {});
+    }
+
+    /** Loads a YAML map of doc mappings from the given file. Returns empty map if file does not exist. */
+    public static Map<String, String> loadDocMappings(Path path) throws IOException {
+        if (!path.toFile().exists()) return new LinkedHashMap<>();
+        return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), new TypeReference<>() {});
     }
 
     /** Looks for settings.yaml in the current directory first, then ~/.prepare-me/. */

@@ -6,9 +6,8 @@ public class MissingDocMappingException extends RuntimeException {
 
     public MissingDocMappingException(String meetingTitle) {
         super("No doc mapping for '" + meetingTitle + "'. "
-                + "Add it to the docMappings section in settings.yaml:\n"
-                + "  docMappings:\n"
-                + "    \"" + meetingTitle + "\": <doc name>");
+                + "Add it to doc-mappings.yaml:\n"
+                + "  \"" + meetingTitle + "\": <doc name>");
         this.meetingTitle = meetingTitle;
     }
 
