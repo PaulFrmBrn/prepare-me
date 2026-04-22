@@ -5,14 +5,15 @@ Person(user, "User (Dmitry)")
 
 System_Boundary(app, "Prepare Me") {
 
-    Container(cli,           "CLI",                   "Java / Picocli",  "Entry point. Parses draft-plan, create-agenda, and save-notes sub-commands with --date flag.")
-    Container(usecases,      "Use Cases",             "Java",            "CreateMeetingCards (draft-plan), PrepareMeetingNotes (create-agenda), SaveMeetingNotes (save-notes). Business rules: event filtering, 1-1 detection, name extraction, card grouping.")
-    Container(calAdapter,    "Calendar Adapter",      "Java",            "Implements CalendarPort. Fetches and filters calendar events via Google Calendar API.")
-    Container(plannerAdapter, "Planner Adapter",       "Java",            "Implements MeetingBoardPort. Creates cards in 'Meetings' list; reads ordered card list with topics (incl. card IDs); posts comments on topic cards. Handles Trello OAuth 1.0a PIN flow internally (first run only); persists token to ~/.prepare-me/tokens/trello.json.")
-    Container(notesAdapter,  "Notes Storage Adapter", "Java",            "Implements MeetingNotesPort. Searches for note documents by name; appends dated Heading 1 + topics; reads back topic sections as TopicContent.")
-    Container(googleAuth,    "Google Auth Provider",  "Java",            "Shared OAuth 2.0 token lifecycle (Calendar + Drive). Persists tokens to ~/.prepare-me/tokens/google.json.")
-    Container(manualResolver,"Manual Doc Name Resolver", "Java / stdin-stdout + YAML", "Implements ManualLinkResolverPort. Checks ~/.prepare-me/doc-mappings.yaml first; if no entry found, prompts user to type the document name and persists the mapping for future runs.")
-    Container(composition,   "AppComposition",        "Java",            "Manual DI root — wires auth providers → adapters → use cases → CLI commands.")
+    Container(cli,           "CLI",                   "Java / Picocli",        "Entry point. Parses draft-plan, create-agenda, save-notes, and serve sub-commands with --date / --port flags.")
+    Container(web,           "Web UI",                "Javalin / Bootstrap 5", "Browser-based UI. Run phases for a given date. Edit excluded-events and doc-mappings on the fly — changes are persisted to YAML files and picked up immediately by the next phase run.")
+    Container(usecases,      "Use Cases",             "Java",                  "CreateMeetingCards (draft-plan), PrepareMeetingNotes (create-agenda), SaveMeetingNotes (save-notes). Business rules: event filtering, 1-1 detection, name extraction, card grouping.")
+    Container(calAdapter,    "Calendar Adapter",      "Java",                  "Implements CalendarPort. Fetches and filters calendar events via Google Calendar API.")
+    Container(plannerAdapter, "Planner Adapter",      "Java",                  "Implements MeetingBoardPort. Creates cards in 'Meetings' list; reads ordered card list with topics (incl. card IDs); posts comments on topic cards. Handles Trello OAuth 1.0a PIN flow internally (first run only); persists token to ~/.prepare-me/tokens/trello.json.")
+    Container(notesAdapter,  "Notes Storage Adapter", "Java",                  "Implements MeetingNotesPort. Searches for note documents by name; appends dated Heading 1 + topics; reads back topic sections as TopicContent.")
+    Container(googleAuth,    "Google Auth Provider",  "Java",                  "Shared OAuth 2.0 token lifecycle (Calendar + Drive). Persists tokens to ~/.prepare-me/tokens/google.json.")
+    Container(manualResolver,"Manual Doc Name Resolver", "Java / YAML",        "Implements ManualLinkResolverPort. Reads ~/.prepare-me/doc-mappings.yaml; throws MissingDocMappingException with hint if meeting title is absent.")
+    Container(composition,   "AppComposition",        "Java",                  "Manual DI root — wires auth providers → adapters → use cases → CLI commands.")
 }
 
 System_Ext(gcal,     "Google Calendar API v3")
@@ -22,8 +23,11 @@ System_Ext(docsApi,  "Google Docs API v1")
 System_Ext(gauth,    "Google OAuth 2.0")
 System_Ext(tauth,    "Trello OAuth 1.0a")
 
-Rel(user,          cli,           "draft-plan / create-agenda --date YYYY-MM-DD", "Terminal")
+Rel(user,          cli,           "draft-plan / create-agenda / save-notes --date YYYY-MM-DD", "Terminal")
+Rel(user,          web,           "open phases & settings", "Browser / HTTP :8080")
 Rel(cli,           usecases,      "execute(date)")
+Rel(web,           usecases,      "execute(date) — use cases created fresh per request")
+Rel(web,           manualResolver,"reads/writes doc-mappings.yaml")
 Rel(usecases,       calAdapter,     "getMeetings(date)")
 Rel(usecases,       plannerAdapter, "createCard() / getMeetingsWithTopics() / addTopicComment()")
 Rel(usecases,       notesAdapter,    "findDoc() / appendAgenda() / readTopicNotes()")
@@ -37,5 +41,6 @@ Rel(notesAdapter,   docsApi,        "GET /documents/{id}  POST /documents/{id}/b
 Rel(googleAuth,    gauth,         "Authorization Code flow + refresh")
 Rel(plannerAdapter, tauth,        "OAuth 1.0a PIN flow (first run only)", "HTTPS")
 Rel(composition,   cli,           "wires")
+Rel(composition,   web,           "wires")
 
 @enduml

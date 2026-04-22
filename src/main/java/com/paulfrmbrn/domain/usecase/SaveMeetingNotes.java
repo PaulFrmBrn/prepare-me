@@ -36,8 +36,8 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
     private static final Logger log = LoggerFactory.getLogger(SaveMeetingNotes.class);
 
     private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+) / (Dima|Dmitry|Dmitrii)(?:\\s.*)?$" +
-                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii) / ([A-Za-z]+)(?:\\s.*)?$");
+            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+)\\s*/\\s*(Dima|Dmitry|Dmitrii)(?:[:\\s].*)?$" +
+                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii)\\s*/\\s*([A-Za-z]+)(?:[:\\s].*)?$");
 
     private final MeetingBoardPort board;
     private final CalendarPort calendar;
@@ -68,9 +68,9 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
 
         for (var meetingCard : meetingsWithTopics) {
             String cardName = meetingCard.name();
-            String eventTitle = cardName.startsWith("Meeting: ")
+            String eventTitle = (cardName.startsWith("Meeting: ")
                     ? cardName.substring("Meeting: ".length())
-                    : cardName;
+                    : cardName).strip();
 
             Meeting calEntry = calendarByTitle.get(eventTitle);
             MeetingType type = detectType(eventTitle, calEntry);

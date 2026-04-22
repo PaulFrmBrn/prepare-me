@@ -49,11 +49,37 @@ public class Settings {
         return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), new TypeReference<>() {});
     }
 
+    /** Saves a list of excluded event names to the given YAML file, creating parent directories as needed. */
+    public static void saveExcludedEvents(Path path, List<String> events) throws IOException {
+        if (path.getParent() != null) java.nio.file.Files.createDirectories(path.getParent());
+        new ObjectMapper(new YAMLFactory()).writeValue(path.toFile(), events);
+    }
+
+    /** Saves doc mappings to the given YAML file, creating parent directories as needed. */
+    public static void saveDocMappings(Path path, Map<String, String> mappings) throws IOException {
+        if (path.getParent() != null) java.nio.file.Files.createDirectories(path.getParent());
+        new ObjectMapper(new YAMLFactory()).writeValue(path.toFile(), mappings);
+    }
+
     /** Looks for settings.yaml in the current directory first, then ~/.prepare-me/. */
     public static Path defaultPath() {
         Path local = Path.of("settings.yaml");
         if (local.toFile().exists()) return local;
         return Path.of(System.getProperty("user.home"), ".prepare-me", "settings.yaml");
+    }
+
+    /** Looks for excluded-events.yaml in the current directory first, then falls back to the configured path. */
+    public static Path resolveExcludedEventsPath(String configuredPath) {
+        Path local = Path.of("excluded-events.yaml");
+        if (local.toFile().exists()) return local;
+        return Path.of(expand(configuredPath));
+    }
+
+    /** Looks for doc-mappings.yaml in the current directory first, then falls back to the configured path. */
+    public static Path resolveDocMappingsPath(String configuredPath) {
+        Path local = Path.of("doc-mappings.yaml");
+        if (local.toFile().exists()) return local;
+        return Path.of(expand(configuredPath));
     }
 
     /** Expands ~/... and leaves absolute and relative paths unchanged. */

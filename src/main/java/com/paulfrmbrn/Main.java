@@ -4,6 +4,7 @@ import com.paulfrmbrn.adapter.in.cli.CreateAgendaCommand;
 import com.paulfrmbrn.adapter.in.cli.DraftPlanCommand;
 import com.paulfrmbrn.adapter.in.cli.PrepareCommand;
 import com.paulfrmbrn.adapter.in.cli.SaveNotesCommand;
+import com.paulfrmbrn.adapter.in.cli.WebCommand;
 import com.paulfrmbrn.adapter.out.google.auth.GoogleAuthProvider;
 import com.paulfrmbrn.adapter.out.google.calendar.GoogleCalendarAdapter;
 import com.paulfrmbrn.adapter.out.google.notes.GoogleNotesAdapter;
@@ -33,10 +34,10 @@ public class Main {
                                                     s.trello.boardName, s.trello.meetingsListName);
             var notesAdapter    = new GoogleNotesAdapter(googleAuth);
 
-            Path docMappingsPath = Path.of(Settings.expand(s.docMappingsFile));
+            Path docMappingsPath = Settings.resolveDocMappingsPath(s.docMappingsFile);
             var resolverAdapter = new ManualDocNameResolverAdapter(docMappingsPath);
 
-            Path excludedEventsPath = Path.of(Settings.expand(s.excludedEventsFile));
+            Path excludedEventsPath = Settings.resolveExcludedEventsPath(s.excludedEventsFile);
             var excludedEvents = new java.util.HashSet<>(Settings.loadExcludedEvents(excludedEventsPath));
 
             var createMeetingCards  = new CreateMeetingCards(calendarAdapter, plannerAdapter, excludedEvents);
@@ -49,6 +50,7 @@ public class Main {
                     .addSubcommand("draft-plan",    new DraftPlanCommand(createMeetingCards))
                     .addSubcommand("create-agenda", new CreateAgendaCommand(prepareMeetingNotes))
                     .addSubcommand("save-notes",    new SaveNotesCommand(saveMeetingNotes))
+                    .addSubcommand("serve",         new WebCommand(s))
                     .setExecutionExceptionHandler((ex, cmd, _) -> {
                         cmd.getErr().println("Error: " + ex.getMessage());
                         return 1;

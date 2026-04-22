@@ -74,6 +74,33 @@ gradle wrapper        # only needed once if ./gradlew doesn't exist yet
 ./gradlew installDist # builds the app to build/install/prepare-me/
 ```
 
+## Web UI
+
+The app ships with a browser-based UI for running phases and editing settings on the fly.
+
+### Start
+
+```bash
+./gradlew run --args="serve"               # starts on http://localhost:8080
+./gradlew run --args="serve --port 9090"   # custom port
+```
+
+Or build and start in one step:
+
+```bash
+./gradlew installDist && build/install/prepare-me/bin/prepare-me serve
+```
+
+Then open **http://localhost:8080** in your browser.
+
+### What you can do in the UI
+
+- **Run Phase** — pick a date and click *Draft Plan*, *Create Agenda*, or *Save Notes*. Results appear inline.
+- **Excluded Events** — edit the list of calendar event titles that are skipped during *Draft Plan*. Click **Save Excluded Events** and the next phase run will see the updated list immediately (no restart needed).
+- **Doc Mappings** — edit the `Meeting Title = Drive Path` entries used by *Create Agenda* for group meetings. Click **Save Doc Mappings** and the next phase run will see the changes immediately.
+
+> Settings are stored in `~/.prepare-me/excluded-events.yaml` and `~/.prepare-me/doc-mappings.yaml` — the same files used by the CLI commands.
+
 ## Usage
 
 ### Phase 1 — Draft Plan

@@ -38,6 +38,10 @@ dependencies {
     // Transitive CVE fixes
     implementation("com.google.guava:guava:33.4.8-jre")
 
+    // Web UI
+    implementation("io.javalin:javalin:6.3.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.4")
+
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.17")
     runtimeOnly("ch.qos.logback:logback-classic:1.5.18")

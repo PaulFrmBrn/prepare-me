@@ -56,6 +56,9 @@ public class GoogleCalendarAdapter implements CalendarPort {
             return items.stream()
                     .filter(e -> e.getSummary() != null)
                     .filter(e -> e.getStart().getDateTime() != null) // skip all-day blocks
+                    .filter(e -> e.getAttendees() == null || e.getAttendees().stream()
+                            .noneMatch(a -> Boolean.TRUE.equals(a.isSelf())
+                                    && "declined".equals(a.getResponseStatus()))) // skip declined
                     .map(e -> {
                         var attendees = e.getAttendees() == null ? List.<String>of()
                                 : e.getAttendees().stream()

@@ -106,12 +106,13 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PrepareMeetingNotes.class);
 
-    // Matches "Name / Dima", "Prefix Name / Dima", "Name / Dima suffix", etc.
-    // Optional prefix (e.g. ticket id "ODM-12259. ") and suffix (e.g. " - milestone 3") are allowed.
+    // Matches "Name / Dima", "Name/Dima", "Prefix Name / Dima", "Name / Dima suffix", etc.
+    // Spaces around "/" are optional. Optional prefix (e.g. ticket id "ODM-12259. ") and
+    // suffix (e.g. " - milestone 3", ": Databricks prep call") are allowed.
     // [^/] in the prefix part ensures titles with multiple "/" (e.g. "A / B / Dmitry") are not matched.
     private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+) / (Dima|Dmitry|Dmitrii)(?:\\s.*)?$" +
-                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii) / ([A-Za-z]+)(?:\\s.*)?$");
+            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+)\\s*/\\s*(Dima|Dmitry|Dmitrii)(?:[:\\s].*)?$" +
+                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii)\\s*/\\s*([A-Za-z]+)(?:[:\\s].*)?$");
 
     private final MeetingBoardPort board;
     private final CalendarPort calendar;
@@ -144,9 +145,9 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
         for (var meetingCard : meetingsWithTopics) {
             String cardName = meetingCard.name();
             // Card names are "Meeting: <event title>"
-            String eventTitle = cardName.startsWith("Meeting: ")
+            String eventTitle = (cardName.startsWith("Meeting: ")
                     ? cardName.substring("Meeting: ".length())
-                    : cardName;
+                    : cardName).strip();
 
             Meeting calEntry = calendarByTitle.get(eventTitle);
             MeetingType type = detectType(eventTitle, calEntry);
