@@ -36,8 +36,8 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
     private static final Logger log = LoggerFactory.getLogger(SaveMeetingNotes.class);
 
     private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+)\\s*/\\s*(Dima|Dmitry|Dmitrii)(?:[:\\s].*)?$" +
-                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii)\\s*/\\s*([A-Za-z]+)(?:[:\\s].*)?$");
+            Pattern.compile("^([^/]+)\\s*/\\s*(Dima|Dmitry|Dmitrii)(?:[:\\s].*)?$" +
+                    "|^(Dima|Dmitry|Dmitrii)\\s*/\\s*([^/:]+)(?:[:\\s].*)?$");
 
     private final MeetingBoardPort board;
     private final CalendarPort calendar;

@@ -68,6 +68,29 @@ class SaveMeetingNotesTest {
     }
 
     @Test
+    void oneOnOneMeeting_multiWordName_usesFullNameAsDocPath() {
+        var topics = List.of(new Topic("t1", "Feedback", List.of()));
+        when(board.getMeetingsWithTopics()).thenReturn(List.of(
+                new MeetingWithTopics("Meeting: Egor A / Dmitry: Random chat 2", topics)
+        ));
+        when(calendar.getMeetings(DATE)).thenReturn(List.of(
+                new Meeting("Egor A / Dmitry: Random chat 2", List.of("egor@x.com", "dima@x.com"))
+        ));
+        when(resolver.resolveDocName("Egor A / Dmitry: Random chat 2"))
+                .thenThrow(new MissingDocMappingException("Egor A / Dmitry: Random chat 2"));
+        var docRef = new DocRef("doc1", "https://docs.google.com/doc1");
+        when(notes.findDoc("_Notes/People/Egor A")).thenReturn(Optional.of(docRef));
+        when(notes.readTopicNotes(docRef, DATE, "Egor A / Dmitry: Random chat 2")).thenReturn(
+                List.of(new TopicContent("Feedback", "some notes"))
+        );
+
+        var result = useCase.execute(DATE);
+
+        assertThat(result).containsExactly(Map.entry("Egor A / Dmitry: Random chat 2", 1));
+        verify(notes).findDoc("_Notes/People/Egor A");
+    }
+
+    @Test
     void skipsTopicWhenNoMatchingCardFound() {
         var topics = List.of(new Topic("t1", "Deploy", List.of()));
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
@@ -136,5 +159,15 @@ class SaveMeetingNotesTest {
     @Test
     void extractOtherPersonName_nameBeforeDima() {
         assertThat(useCase.extractOtherPersonName("Ivan / Dima")).isEqualTo("Ivan");
+    }
+
+    @Test
+    void extractOtherPersonName_multiWordNameBeforeDmitry() {
+        assertThat(useCase.extractOtherPersonName("Egor A / Dmitry: Random chat 2")).isEqualTo("Egor A");
+    }
+
+    @Test
+    void extractOtherPersonName_multiWordNameAfterDmitry() {
+        assertThat(useCase.extractOtherPersonName("Dmitry / Egor A: Random chat")).isEqualTo("Egor A");
     }
 }
