@@ -8,6 +8,7 @@ import com.google.api.services.docs.v1.model.DateElementProperties;
 import com.google.api.services.docs.v1.model.InsertDateRequest;
 import com.google.api.services.docs.v1.model.InsertTextRequest;
 import com.google.api.services.docs.v1.model.Location;
+import com.google.api.services.docs.v1.model.Bullet;
 import com.google.api.services.docs.v1.model.Paragraph;
 import com.google.api.services.docs.v1.model.ParagraphStyle;
 import com.google.api.services.docs.v1.model.Range;
@@ -237,7 +238,7 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
                     currentBody = new StringBuilder();
                 } else if (currentTopicName != null && !text.isEmpty()) {
                     if (currentBody.length() > 0) currentBody.append("\n");
-                    currentBody.append(text);
+                    currentBody.append(formatBodyLine(p, text));
                 }
             }
 
@@ -270,6 +271,13 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
                 .filter(e -> e.getTextRun() != null)
                 .map(e -> e.getTextRun().getContent())
                 .collect(Collectors.joining());
+    }
+
+    static String formatBodyLine(Paragraph paragraph, String text) {
+        Bullet bullet = paragraph.getBullet();
+        if (bullet == null) return text;
+        int level = bullet.getNestingLevel() != null ? bullet.getNestingLevel() : 0;
+        return "  ".repeat(level) + "- " + text;
     }
 
     /** Navigates Drive folder hierarchy and returns the ID of the deepest folder, or null if not found. */
