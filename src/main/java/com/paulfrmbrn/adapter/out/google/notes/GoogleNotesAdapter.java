@@ -5,6 +5,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.docs.v1.Docs;
 import com.google.api.services.docs.v1.model.BatchUpdateDocumentRequest;
 import com.google.api.services.docs.v1.model.DateElementProperties;
+import com.google.api.services.docs.v1.model.Document;
 import com.google.api.services.docs.v1.model.InsertDateRequest;
 import com.google.api.services.docs.v1.model.InsertTextRequest;
 import com.google.api.services.docs.v1.model.Location;
@@ -106,6 +107,12 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
             var docs = buildDocs();
 
             var document = docs.documents().get(doc.id()).execute();
+
+            if (agendaEntryExists(document, meetingName, date)) {
+                log.info("Agenda for '{}' on {} already exists in document {}, skipping", meetingName, date, doc.id());
+                return;
+            }
+
             int endIndex = document.getBody().getContent().stream()
                     .mapToInt(e -> e.getEndIndex() != null ? e.getEndIndex() : 0)
                     .max()
@@ -154,6 +161,51 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
         } catch (IOException | GeneralSecurityException e) {
             throw new RuntimeException("Failed to append agenda to document '" + doc.id() + "': " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Returns true if a HEADING_1 paragraph containing {@code meetingName} already has a date chip
+     * whose title or URI contains the ISO-8601 date string for {@code date}.
+     */
+    static boolean agendaEntryExists(Document document, String meetingName, LocalDate date) {
+        List<StructuralElement> content = document.getBody().getContent();
+        if (content == null) return false;
+        String isoDate = date.toString(); // "YYYY-MM-DD"
+        for (StructuralElement element : content) {
+            Paragraph paragraph = element.getParagraph();
+            if (paragraph == null) continue;
+            if (!isHeading(paragraph, "HEADING_1")) continue;
+            if (!extractText(paragraph).contains(meetingName)) continue;
+            if (paragraph.getElements() == null) continue;
+            for (var pe : paragraph.getElements()) {
+                // Log all non-text elements to help diagnose how date chips are returned
+                if (pe.getTextRun() == null) {
+                    log.info("Non-text element in HEADING_1 '{}': richLink={}, person={}, inlineObject={}, equation={}, raw={}",
+                            meetingName,
+                            pe.getRichLink(),
+                            pe.getPerson(),
+                            pe.getInlineObjectElement(),
+                            pe.getEquation(),
+                            pe);
+                    if (pe.getRichLink() != null) {
+                        log.info("  RichLink props: title={}, uri={}, mimeType={}",
+                                pe.getRichLink().getRichLinkProperties() != null ? pe.getRichLink().getRichLinkProperties().getTitle() : "null",
+                                pe.getRichLink().getRichLinkProperties() != null ? pe.getRichLink().getRichLinkProperties().getUri() : "null",
+                                pe.getRichLink().getRichLinkProperties() != null ? pe.getRichLink().getRichLinkProperties().getMimeType() : "null");
+                    }
+                }
+                var richLink = pe.getRichLink();
+                if (richLink == null || richLink.getRichLinkProperties() == null) continue;
+                String title = richLink.getRichLinkProperties().getTitle();
+                String uri = richLink.getRichLinkProperties().getUri();
+                log.info("Checking date chip in '{}': title='{}', uri='{}', looking for '{}'",
+                        meetingName, title, uri, isoDate);
+                if ((title != null && title.contains(isoDate)) || (uri != null && uri.contains(isoDate))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static List<Request> buildHeadingStyleRequests(String text, int insertAt) {
