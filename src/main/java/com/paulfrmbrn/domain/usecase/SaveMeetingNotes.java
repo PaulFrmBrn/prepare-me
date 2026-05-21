@@ -84,7 +84,8 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
                     String personName = extractOtherPersonName(eventTitle);
                     drivePath = notesDir + "/People/" + personName;
                 } else {
-                    System.out.println("Skipped: " + e.getMessage());
+                    log.warn("No doc mapping for '{}', skipping", eventTitle);
+                    result.put(eventTitle, -1);
                     continue;
                 }
             }
@@ -92,6 +93,7 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
             Optional<DocRef> docRef = notes.findDoc(drivePath);
             if (docRef.isEmpty()) {
                 log.warn("No notes document found for '{}', skipping", eventTitle);
+                result.put(eventTitle, -1);
                 continue;
             }
 
@@ -135,6 +137,9 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
             throw new IllegalArgumentException("Not a 1-1 title: " + eventTitle);
         }
         String name = matcher.group(1) != null ? matcher.group(1) : matcher.group(4);
-        return name.trim();
+        name = name.trim();
+        // Strip ticket prefix like "ODM-12259. " before the person name
+        name = name.replaceFirst("^[A-Z]+-\\d+\\.\\s*", "");
+        return name;
     }
 }

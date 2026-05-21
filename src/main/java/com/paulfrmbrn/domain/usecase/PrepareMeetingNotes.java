@@ -161,7 +161,8 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
                     String personName = extractOtherPersonName(eventTitle);
                     drivePath = notesDir + "/People/" + personName;
                 } else {
-                    System.out.println("Skipped: " + e.getMessage());
+                    log.warn("No doc mapping for '{}', skipping", eventTitle);
+                    result.put(eventTitle, null);
                     continue;
                 }
             }
@@ -170,6 +171,7 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
 
             if (docRef.isEmpty()) {
                 log.warn("No notes document found for '{}', skipping agenda append", eventTitle);
+                result.put(eventTitle, null);
                 continue;
             }
 

@@ -124,7 +124,8 @@ class SaveMeetingNotesTest {
 
         var result = useCase.execute(DATE);
 
-        assertThat(result).isEmpty();
+        assertThat(result).hasSize(1).containsKey("Weekly Sync");
+        assertThat(result.get("Weekly Sync")).isEqualTo(-1);
         verifyNoInteractions(notes);
     }
 
@@ -141,7 +142,8 @@ class SaveMeetingNotesTest {
 
         var result = useCase.execute(DATE);
 
-        assertThat(result).isEmpty();
+        assertThat(result).hasSize(1).containsKey("Ivan / Dima");
+        assertThat(result.get("Ivan / Dima")).isEqualTo(-1);
         verify(notes, never()).readTopicNotes(any(), any(), any());
     }
 
@@ -169,5 +171,10 @@ class SaveMeetingNotesTest {
     @Test
     void extractOtherPersonName_multiWordNameAfterDmitry() {
         assertThat(useCase.extractOtherPersonName("Dmitry / Egor A: Random chat")).isEqualTo("Egor A");
+    }
+
+    @Test
+    void extractOtherPersonName_withTicketPrefix() {
+        assertThat(useCase.extractOtherPersonName("ODM-12259. Mikhail / Dmitry")).isEqualTo("Mikhail");
     }
 }

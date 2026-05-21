@@ -133,7 +133,8 @@ class PrepareMeetingNotesTest {
 
         var result = useCase.execute(DATE);
 
-        assertThat(result).isEmpty();
+        assertThat(result).hasSize(1).containsKey("Standup");
+        assertThat(result.get("Standup")).isNull();
         verify(resolver).resolveDocName("Standup");
         verifyNoInteractions(notes);
     }
@@ -157,8 +158,29 @@ class PrepareMeetingNotesTest {
 
         var result = useCase.execute(DATE);
 
-        assertThat(result).containsExactly(Map.entry("Ivan / Dima", "https://docs.google.com/doc4"));
+        assertThat(result).hasSize(2).containsKey("Weekly Sync");
+        assertThat(result.get("Weekly Sync")).isNull();
+        assertThat(result).containsEntry("Ivan / Dima", "https://docs.google.com/doc4");
         verify(notes, never()).appendAgenda(any(), any(), any(), eq(List.of(topicItem)));
+    }
+
+    @Test
+    void oneOnOneMeeting_noDocFound_returnsNullUrl() {
+        when(board.getMeetingsWithTopics()).thenReturn(List.of(
+                new MeetingWithTopics("Meeting: Darias/Dmitry", List.of())
+        ));
+        when(calendar.getMeetings(DATE)).thenReturn(List.of(
+                new Meeting("Darias/Dmitry", List.of("darias@example.com", "dmitry@example.com"))
+        ));
+        when(resolver.resolveDocName("Darias/Dmitry")).thenThrow(new MissingDocMappingException("Darias/Dmitry"));
+        when(notes.findDoc("_Notes/People/Darias")).thenReturn(Optional.empty());
+
+        var result = useCase.execute(DATE);
+
+        assertThat(result).hasSize(1).containsKey("Darias/Dmitry");
+        assertThat(result.get("Darias/Dmitry")).isNull();
+        verify(notes).findDoc("_Notes/People/Darias");
+        verify(notes, never()).appendAgenda(any(), any(), any(), any());
     }
 
     @Test

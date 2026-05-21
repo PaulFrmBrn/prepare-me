@@ -128,14 +128,23 @@
     if (phase === 'create-agenda') {
       const entries = Object.entries(data);
       if (entries.length === 0) return 'No agendas created.';
-      return 'Agendas written (' + entries.length + '):\n'
-        + entries.map(([k, v]) => '  • ' + esc(k) + '\n    <a href="' + esc(v) + '" target="_blank">' + esc(v) + '</a>').join('\n');
+      const written  = entries.filter(([, v]) => v !== null);
+      const skipped  = entries.filter(([, v]) => v === null);
+      const lines = [];
+      if (written.length)  lines.push('Agendas written (' + written.length + '):\n'
+        + written.map(([k, v]) => '  • ' + esc(k) + '\n    <a href="' + esc(v) + '" target="_blank">' + esc(v) + '</a>').join('\n'));
+      if (skipped.length)  lines.push('Skipped (no doc found):\n' + skipped.map(([k]) => '  • ' + esc(k)).join('\n'));
+      return lines.join('\n\n');
     }
     if (phase === 'save-notes') {
       const entries = Object.entries(data);
-      return entries.length === 0
-        ? 'No notes saved.'
-        : 'Notes saved:\n' + entries.map(([k, v]) => '  • ' + esc(k) + ': ' + esc(v) + ' comment(s)').join('\n');
+      if (entries.length === 0) return 'No notes saved.';
+      const saved    = entries.filter(([, v]) => v >= 0);
+      const skipped  = entries.filter(([, v]) => v < 0);
+      const lines = [];
+      if (saved.length)   lines.push('Notes saved:\n'   + saved.map(([k, v])  => '  • ' + esc(k) + ': ' + esc(v) + ' comment(s)').join('\n'));
+      if (skipped.length) lines.push('Skipped (no doc found):\n' + skipped.map(([k]) => '  • ' + esc(k)).join('\n'));
+      return lines.join('\n\n');
     }
     return esc(JSON.stringify(data, null, 2));
   }
