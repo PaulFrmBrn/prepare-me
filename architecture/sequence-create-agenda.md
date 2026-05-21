@@ -21,15 +21,15 @@ sequenceDiagram
     Cal-->>UC: calendar events
 
     loop For each meeting
-        alt 1-on-1 ("Name / Dima" title)
-            UC->>Notes: findDoc(personName) + appendAgenda(...)
+        UC->>Mapping: resolveDocName(meetingTitle)
+        alt mapping found
+            UC->>Notes: findDoc(docName) + appendAgenda(...)
             Notes-->>UC: doc URL
-        else Group meeting
-            UC->>Mapping: lookup(meetingTitle)
-            alt mapping found
-                UC->>Notes: findDoc(docName) + appendAgenda(...)
+        else MissingDocMappingException
+            alt 1-on-1 ("Name / Dima" title)
+                UC->>Notes: findDoc(notesDir/People/personName) + appendAgenda(...)
                 Notes-->>UC: doc URL
-            else not found
+            else Group meeting
                 UC-->>CLI: skip with hint to add mapping
             end
         end

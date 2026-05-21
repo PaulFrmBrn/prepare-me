@@ -16,7 +16,8 @@ sequenceDiagram
     UC->>Cal: getMeetings("2026-04-12")
     Cal->>GCal: GET /calendars/primary/events?timeMin&timeMax
     GCal-->>Cal: List<Event>
-    Cal-->>UC: meetings (excl. "NO MEETINGS, PLEASE", "Lunch")
+    Cal-->>UC: meetings (filtered: non-all-day, non-declined)
+    Note over UC: Filter out events listed in excluded-events.yaml
 
     loop For each meeting
         UC->>Planner: createCard("Meeting: <event title>", list="Meetings")

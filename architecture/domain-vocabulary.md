@@ -7,7 +7,7 @@ Key concepts used across architecture diagrams, code, and documentation.
 ## Core Concepts
 
 **Meeting**
-A calendar event that requires preparation. Not all calendar events are meetings — events named *"NO MEETINGS, PLEASE"* and *"Lunch"* are excluded from all processing. Fields: `name` (event title as shown in calendar), `attendees` (list of participant email addresses, populated by CalendarAdapter from Google Calendar data and used in `create-agenda` for MeetingType classification).
+A calendar event that requires preparation. Not all calendar events are meetings — events listed in `~/.prepare-me/excluded-events.yaml` are excluded from Draft Plan processing. The exclusion list is configurable and can be edited via the Web UI. The Calendar Adapter itself only filters out all-day events and declined events. Fields: `name` (event title as shown in calendar), `attendees` (list of participant email addresses, populated by CalendarAdapter from Google Calendar data and used in `create-agenda` for MeetingType classification).
 
 **MeetingType**
 Classifies a meeting for the purpose of locating its notes document.
@@ -63,7 +63,7 @@ Locates a notes document by person/team name, appends a dated agenda, and reads 
 - `List<TopicContent> readTopicNotes(DocRef doc, LocalDate date, String meetingName)` — used by Save Notes; returns one `TopicContent` per agenda topic that has non-empty body content
 
 **ManualLinkResolverPort**
-Resolves a notes document name for a meeting when automatic lookup fails. First checks a local mapping file (`~/.prepare-me/doc-mappings.yaml`); if no entry is found, prompts the user to type the document name (not a URL) and persists the new mapping for future runs. Hides the I/O mechanism and local storage (currently stdin/stdout + YAML file).
+Resolves a notes document name for a meeting. Checks a separate local mapping file (`~/.prepare-me/doc-mappings.yaml`, path configurable via `docMappingsFile` in `settings.yaml`); if no entry is found, throws `MissingDocMappingException`. The calling use case catches this exception and either falls back to automatic path resolution (for 1-on-1 meetings) or skips the meeting with a warning (for group meetings). New mappings are added manually to the YAML file or through the Web UI settings. Hides the local storage mechanism (currently YAML file).
 - `String resolveDocName(String meetingTitle)`
 
 ---
