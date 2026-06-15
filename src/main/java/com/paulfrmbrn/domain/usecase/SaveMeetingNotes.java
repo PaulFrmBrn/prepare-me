@@ -101,13 +101,14 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
 
             Map<String, String> topicIdByName = meetingCard.topics().stream()
                     .collect(Collectors.toMap(t -> t.name(), t -> t.id(), (a, _) -> a));
+            log.debug("Trello topics for '{}': {}", eventTitle, topicIdByName.keySet());
 
             int postedCount = 0;
             for (TopicContent tc : topicContents) {
                 String topicId = topicIdByName.get(tc.topicName());
                 if (topicId == null || topicId.isBlank()) {
-                    log.warn("No Trello card found for topic '{}' in meeting '{}', skipping",
-                            tc.topicName(), eventTitle);
+                    log.warn("No Trello card found for topic '{}' in meeting '{}', skipping. Available topics: {}",
+                            tc.topicName(), eventTitle, topicIdByName.keySet());
                     continue;
                 }
                 String comment = date + "\n\n" + tc.bodyText() + "\n\n" + docRef.get().url();

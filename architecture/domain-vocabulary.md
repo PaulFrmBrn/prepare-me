@@ -17,6 +17,8 @@ Classifies a meeting for the purpose of locating its notes document.
 **TopicCard**
 An agenda item the user wants to cover in a meeting. Topic cards are created manually in the Planner (Add Topics step) and are positioned below the meeting's Planner card. The ordered list of topic cards under a meeting card forms its agenda. Each topic card carries a board-side `id` used to post comments (Save Notes phase).
 
+A topic card may be a **Trello link card** — a card that has another Trello card's URL as an attachment. Link cards are used to share a single topic across multiple meetings: the original card sits under one meeting, and a link card (with the original card's URL attached) sits under another. Link cards appear in the agenda normally. For Save Notes, comments are always posted to the original card; the `id` field on a link card `Topic` resolves to the original card's ID (handled transparently by the Trello adapter, invisible to use cases).
+
 **TopicContent**
 A topic section read back from a notes document: `topicName` (matches the Trello topic card name) and `bodyText` (all content beneath the topic heading — checklist item lines and free-text notes the user wrote — excluding the heading line itself).
 

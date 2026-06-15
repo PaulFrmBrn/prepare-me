@@ -15,7 +15,7 @@ sequenceDiagram
     CLI->>UC: execute("2026-04-12")
 
     UC->>Planner: getMeetingsWithTopics()
-    Planner-->>UC: meetings with topic cards (incl. card IDs)
+    Planner-->>UC: meetings with topic cards (incl. card IDs; link cards resolve to original card ID)
 
     UC->>Cal: getMeetings("2026-04-12")
     Cal-->>UC: calendar events

@@ -191,6 +191,59 @@ class TrelloAdapterGetMeetingsWithTopicsTest {
         assertThat(topic.checklists()).isEmpty();
     }
 
+    @Test
+    void linkCard_usesOriginalCardIdAndNameForComments() throws Exception {
+        when(http.send(any(HttpRequest.class), any())).thenAnswer(inv -> {
+            HttpRequest req = inv.getArgument(0);
+            String url = req.uri().toString();
+            if (url.contains("/members/me/boards"))
+                return response("[{\"id\":\"b1\",\"name\":\"work\"}]");
+            if (url.contains("/boards/b1/lists"))
+                return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
+            if (url.contains("/cards/shortAbc"))
+                return response("{\"id\":\"orig1\",\"name\":\"Implement Feature A\"}");
+            return response("""
+                    [
+                      {"id":"m1","name":"Meeting: John / Dmitry","checklists":[],"attachments":[]},
+                      {"id":"link1","name":"Link card different name","checklists":[],
+                       "attachments":[{"url":"https://trello.com/c/shortAbc/1-implement-feature-a"}]}
+                    ]
+                    """);
+        });
+
+        var adapter = new TrelloAdapter("key", "token", "work", "Meetings", http);
+        var result = adapter.getMeetingsWithTopics();
+
+        assertThat(result).hasSize(1);
+        Topic topic = result.get(0).topics().get(0);
+        assertThat(topic.id()).isEqualTo("orig1");          // original card ID, not the link card
+        assertThat(topic.name()).isEqualTo("Implement Feature A");  // original card name, not the link card name
+    }
+
+    @Test
+    void regularCard_withNoAttachments_usesOwnId() throws Exception {
+        when(http.send(any(HttpRequest.class), any())).thenAnswer(inv -> {
+            HttpRequest req = inv.getArgument(0);
+            String url = req.uri().toString();
+            if (url.contains("/members/me/boards"))
+                return response("[{\"id\":\"b1\",\"name\":\"work\"}]");
+            if (url.contains("/boards/b1/lists"))
+                return response("[{\"id\":\"l1\",\"name\":\"Meetings\"}]");
+            return response("""
+                    [
+                      {"id":"m1","name":"Meeting: Jane / Dmitry","checklists":[],"attachments":[]},
+                      {"id":"orig1","name":"Implement Feature A","checklists":[],"attachments":[]}
+                    ]
+                    """);
+        });
+
+        var adapter = new TrelloAdapter("key", "token", "work", "Meetings", http);
+        var result = adapter.getMeetingsWithTopics();
+
+        Topic topic = result.get(0).topics().get(0);
+        assertThat(topic.id()).isEqualTo("orig1");
+    }
+
     @SuppressWarnings("unchecked")
     private HttpResponse<String> response(String body) {
         HttpResponse<String> r = mock(HttpResponse.class);
