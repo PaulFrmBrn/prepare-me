@@ -51,8 +51,10 @@ import java.util.stream.Collectors;
  *   <li><strong>ONE_ON_ONE</strong> – path is built as {@code {notesDir}/People/{otherPersonName}},
  *       where {@code otherPersonName} is the non-Dima/Dmitry participant extracted from the title.</li>
  *   <li><strong>GROUP</strong> – path is resolved via {@link ManualLinkResolverPort}, which looks up
- *       the meeting title in the {@code docMappings} section of {@code settings.yaml}.
- *       If no entry exists, a {@link com.paulfrmbrn.adapter.out.mapping.MissingDocMappingException}
+ *       the meeting title in the {@code titles} section of {@code doc-mappings.yaml} and, failing
+ *       that, matches it against the title prefixes in the {@code prefixes} section (e.g. every
+ *       {@code "AIT: ..."} team meeting maps to one document).
+ *       If no entry matches, a {@link com.paulfrmbrn.adapter.out.mapping.MissingDocMappingException}
  *       is thrown, the meeting is skipped with a console message, and processing continues
  *       with the next meeting.</li>
  * </ul>

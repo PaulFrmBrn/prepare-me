@@ -33,6 +33,25 @@ public class Settings {
         public String meetingsListName = "Meetings";
     }
 
+    /**
+     * Content of {@code doc-mappings.yaml}: exact meeting titles and title-prefix rules.
+     *
+     * <pre>
+     * titles:
+     *   "Management Meeting": "_Notes/Teams/Senior Management team"
+     * prefixes:
+     *   "AIT:": "_Notes/Teams/AIT"
+     * </pre>
+     *
+     * A prefix rule maps every meeting whose title starts with the prefix (e.g. every
+     * {@code "AIT: ..."} team meeting) to one document; the longest matching prefix wins.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DocMappings {
+        public Map<String, String> titles = new LinkedHashMap<>();
+        public Map<String, String> prefixes = new LinkedHashMap<>();
+    }
+
     public static Settings load(Path path) throws IOException {
         return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), Settings.class);
     }
@@ -43,10 +62,31 @@ public class Settings {
         return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), new TypeReference<>() {});
     }
 
-    /** Loads a YAML map of doc mappings from the given file. Returns empty map if file does not exist. */
-    public static Map<String, String> loadDocMappings(Path path) throws IOException {
-        if (!path.toFile().exists()) return new LinkedHashMap<>();
-        return new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), new TypeReference<>() {});
+    /**
+     * Loads doc mappings from the given YAML file. Returns empty mappings if the file does not exist.
+     * A file without {@code titles:}/{@code prefixes:} sections is read as a flat legacy
+     * {@code title: doc} map.
+     */
+    public static DocMappings loadDocMappings(Path path) throws IOException {
+        var mappings = new DocMappings();
+        if (!path.toFile().exists()) return mappings;
+        Map<String, Object> raw = new ObjectMapper(new YAMLFactory()).readValue(path.toFile(), new TypeReference<>() {});
+        if (raw == null || raw.isEmpty()) return mappings;
+        if (!raw.containsKey("titles") && !raw.containsKey("prefixes")) {
+            raw.forEach((title, doc) -> mappings.titles.put(title, String.valueOf(doc)));
+            return mappings;
+        }
+        mappings.titles.putAll(asStringMap(raw.get("titles")));
+        mappings.prefixes.putAll(asStringMap(raw.get("prefixes")));
+        return mappings;
+    }
+
+    private static Map<String, String> asStringMap(Object section) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (section instanceof Map<?, ?> map) {
+            map.forEach((k, v) -> result.put(String.valueOf(k), String.valueOf(v)));
+        }
+        return result;
     }
 
     /** Saves a list of excluded event names to the given YAML file, creating parent directories as needed. */
@@ -56,7 +96,7 @@ public class Settings {
     }
 
     /** Saves doc mappings to the given YAML file, creating parent directories as needed. */
-    public static void saveDocMappings(Path path, Map<String, String> mappings) throws IOException {
+    public static void saveDocMappings(Path path, DocMappings mappings) throws IOException {
         if (path.getParent() != null) java.nio.file.Files.createDirectories(path.getParent());
         new ObjectMapper(new YAMLFactory()).writeValue(path.toFile(), mappings);
     }

@@ -79,7 +79,7 @@ public class WebServer {
                 ctx.json(Settings.loadDocMappings(docMappingsPath)));
 
         app.put("/api/settings/doc-mappings", ctx -> {
-            Map<String, String> mappings = JSON.readValue(ctx.body(), new TypeReference<Map<String, String>>() {});
+            var mappings = JSON.readValue(ctx.body(), Settings.DocMappings.class);
             Settings.saveDocMappings(docMappingsPath, mappings);
             ctx.status(204);
         });

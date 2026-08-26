@@ -65,7 +65,7 @@ Locates a notes document by person/team name, appends a dated agenda, and reads 
 - `List<TopicContent> readTopicNotes(DocRef doc, LocalDate date, String meetingName)` — used by Save Notes; returns one `TopicContent` per agenda topic that has non-empty body content
 
 **ManualLinkResolverPort**
-Resolves a notes document name for a meeting. Checks a separate local mapping file (`~/.prepare-me/doc-mappings.yaml`, path configurable via `docMappingsFile` in `settings.yaml`); if no entry is found, throws `MissingDocMappingException`. The calling use case catches this exception and either falls back to automatic path resolution (for 1-on-1 meetings) or skips the meeting with a warning (for group meetings). New mappings are added manually to the YAML file or through the Web UI settings. Hides the local storage mechanism (currently YAML file).
+Resolves a notes document name for a meeting. Checks a separate local mapping file (`~/.prepare-me/doc-mappings.yaml`, path configurable via `docMappingsFile` in `settings.yaml`) — first the `titles` section for an exact meeting title, then the `prefixes` section for the longest title prefix the meeting starts with (e.g. `"AIT:"` → the AIT team document); if neither matches, throws `MissingDocMappingException`. The calling use case catches this exception and either falls back to automatic path resolution (for 1-on-1 meetings) or skips the meeting with a warning (for group meetings). New mappings are added manually to the YAML file or through the Web UI settings. Hides the local storage mechanism (currently YAML file).
 - `String resolveDocName(String meetingTitle)`
 
 ---

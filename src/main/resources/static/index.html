@@ -57,7 +57,9 @@
         <div class="card-header fw-semibold">Doc Mappings</div>
         <div class="card-body d-flex flex-column">
           <p class="text-muted small mb-2">
-            One mapping per line: <code>Meeting Title = Drive Path</code><br>
+            One mapping per line: <code>Meeting Title = Drive Path</code>,
+            or <code>Prefix:* = Drive Path</code> to map every meeting whose title starts
+            with that prefix (e.g. <code>AIT:* = _Notes/Teams/AIT</code>).<br>
             Used by <strong>Create Agenda</strong> for group meetings.
             1-1 meetings matching <em>Name / Dmitry</em> are auto-resolved.
           </p>
@@ -159,8 +161,10 @@
       const events   = await evRes.json();
       const mappings = await mapRes.json();
       document.getElementById('excludedEvents').value = events.join('\n');
-      document.getElementById('docMappings').value =
-        Object.entries(mappings).map(([k, v]) => k + ' = ' + v).join('\n');
+      document.getElementById('docMappings').value = [
+        ...Object.entries(mappings.titles   || {}).map(([k, v]) => k + ' = ' + v),
+        ...Object.entries(mappings.prefixes || {}).map(([k, v]) => k + '* = ' + v)
+      ].join('\n');
     } catch (e) {
       console.error('Failed to load settings', e);
     }
@@ -181,10 +185,15 @@
   async function saveDocMappings() {
     const lines = document.getElementById('docMappings').value
       .split('\n').map(l => l.trim()).filter(Boolean);
-    const mappings = {};
+    const mappings = { titles: {}, prefixes: {} };
     for (const line of lines) {
       const idx = line.indexOf(' = ');
-      if (idx > 0) mappings[line.substring(0, idx).trim()] = line.substring(idx + 3).trim();
+      if (idx <= 0) continue;
+      const key   = line.substring(0, idx).trim();
+      const value = line.substring(idx + 3).trim();
+      // A trailing "*" marks a title-prefix rule rather than an exact title
+      if (key.endsWith('*')) mappings.prefixes[key.slice(0, -1).trim()] = value;
+      else                   mappings.titles[key] = value;
     }
     const res = await fetch('/api/settings/doc-mappings', {
       method: 'PUT',

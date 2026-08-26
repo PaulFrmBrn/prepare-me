@@ -60,7 +60,7 @@ Open `~/.prepare-me/settings.yaml` and set:
 - `trello.apiToken` — the token from step 4
 - `trello.boardName` — exact name of your Trello board (case-sensitive)
 - `trello.meetingsListName` — exact name of the list to create cards in
-- `docMappings` — map of calendar event title → notes document name in Google Drive, used by `create-agenda` for group meetings and any 1-1 that isn't auto-detected. If a meeting is missing from this map, it is skipped with a message telling you what to add.
+- `docMappingsFile` — path to `doc-mappings.yaml`, which maps meetings to notes documents in Google Drive for `create-agenda` and `save-notes`. It has two sections: `titles` (exact calendar event title → document) and `prefixes` (title prefix → document, e.g. `"AIT:"` maps every `AIT: ...` team meeting to one document; the longest matching prefix wins and an exact `titles` entry always wins over a prefix). 1-1 meetings named `Name / Dmitry` need no entry — they resolve to `People/<Name>` automatically. A group meeting matching neither section is skipped with a message telling you what to add.
 - `excludedEvents` — list of calendar event titles to ignore during `draft-plan` (e.g. "Out of office", "Lunch"). The template includes common defaults; extend it for any recurring non-meeting events on your calendar.
 
 The Google credentials path is already set to the correct default.
@@ -97,7 +97,7 @@ Then open **http://localhost:8080** in your browser.
 
 - **Run Phase** — pick a date and click *Draft Plan*, *Create Agenda*, or *Save Notes*. Results appear inline.
 - **Excluded Events** — edit the list of calendar event titles that are skipped during *Draft Plan*. Click **Save Excluded Events** and the next phase run will see the updated list immediately (no restart needed).
-- **Doc Mappings** — edit the `Meeting Title = Drive Path` entries used by *Create Agenda* for group meetings. Click **Save Doc Mappings** and the next phase run will see the changes immediately.
+- **Doc Mappings** — edit the `Meeting Title = Drive Path` entries used by *Create Agenda* for group meetings. A trailing `*` on the key makes it a title-prefix rule (`AIT:* = _Notes/Teams/AIT`). Click **Save Doc Mappings** and the next phase run will see the changes immediately.
 
 > Settings are stored in `~/.prepare-me/excluded-events.yaml` and `~/.prepare-me/doc-mappings.yaml` — the same files used by the CLI commands.
 
@@ -129,7 +129,7 @@ Reads the Meetings list from Trello, finds the Google Doc for each meeting, and 
 
 The command prints a numbered list of Google Doc links — one per processed meeting — ready to open before each call.
 
-Group meetings that are not yet in `docMappings` in `~/.prepare-me/settings.yaml` are skipped with a message showing the exact entry to add.
+Group meetings matched by neither the `titles` nor the `prefixes` section of `~/.prepare-me/doc-mappings.yaml` are skipped with a message showing the exact entry to add.
 
 ---
 

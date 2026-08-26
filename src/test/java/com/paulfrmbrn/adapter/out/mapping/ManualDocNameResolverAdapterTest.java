@@ -16,7 +16,7 @@ class ManualDocNameResolverAdapterTest {
     Path tempDir;
 
     @Test
-    void returnsDocNameFromMapping() throws IOException {
+    void returnsDocNameFromLegacyFlatMapping() throws IOException {
         Path file = tempDir.resolve("doc-mappings.yaml");
         Files.writeString(file, "\"Weekly Sync\": Platform Team\n");
         var adapter = new ManualDocNameResolverAdapter(file);
@@ -34,6 +34,77 @@ class ManualDocNameResolverAdapterTest {
                 .isInstanceOf(MissingDocMappingException.class)
                 .hasMessageContaining("Monthly Review")
                 .hasMessageContaining("doc-mappings.yaml");
+    }
+
+    @Test
+    void returnsDocNameFromTitlesSection() throws IOException {
+        Path file = tempDir.resolve("doc-mappings.yaml");
+        Files.writeString(file, "titles:\n  \"Weekly Sync\": Platform Team\n");
+        var adapter = new ManualDocNameResolverAdapter(file);
+
+        assertThat(adapter.resolveDocName("Weekly Sync")).isEqualTo("Platform Team");
+    }
+
+    @Test
+    void returnsDocNameByTitlePrefix() throws IOException {
+        Path file = tempDir.resolve("doc-mappings.yaml");
+        Files.writeString(file, "prefixes:\n  \"AIT:\": \"_Notes/Teams/AIT\"\n");
+        var adapter = new ManualDocNameResolverAdapter(file);
+
+        assertThat(adapter.resolveDocName("AIT: Sync on AIT-8")).isEqualTo("_Notes/Teams/AIT");
+    }
+
+    @Test
+    void prefersExactTitleOverPrefix() throws IOException {
+        Path file = tempDir.resolve("doc-mappings.yaml");
+        Files.writeString(file, """
+                titles:
+                  "AIT: Retro": "_Notes/Teams/AIT retro"
+                prefixes:
+                  "AIT:": "_Notes/Teams/AIT"
+                """);
+        var adapter = new ManualDocNameResolverAdapter(file);
+
+        assertThat(adapter.resolveDocName("AIT: Retro")).isEqualTo("_Notes/Teams/AIT retro");
+    }
+
+    @Test
+    void prefersLongestMatchingPrefix() throws IOException {
+        Path file = tempDir.resolve("doc-mappings.yaml");
+        Files.writeString(file, """
+                prefixes:
+                  "AIT:": "_Notes/Teams/AIT"
+                  "AIT: Copilot": "_Notes/Teams/AIT Copilot"
+                """);
+        var adapter = new ManualDocNameResolverAdapter(file);
+
+        assertThat(adapter.resolveDocName("AIT: Copilot weekly")).isEqualTo("_Notes/Teams/AIT Copilot");
+        assertThat(adapter.resolveDocName("AIT: Sprint review")).isEqualTo("_Notes/Teams/AIT");
+    }
+
+    @Test
+    void matchesTicketIdPrefixLiterally() throws IOException {
+        Path file = tempDir.resolve("doc-mappings.yaml");
+        Files.writeString(file, """
+                prefixes:
+                  "ODM-12259.": "_Notes/Teams/ODM"
+                """);
+        var adapter = new ManualDocNameResolverAdapter(file);
+
+        assertThat(adapter.resolveDocName("ODM-12259. Sprint Review")).isEqualTo("_Notes/Teams/ODM");
+        // "." is a literal character here, not a regex wildcard
+        assertThatThrownBy(() -> adapter.resolveDocName("ODM-12259X Sprint Review"))
+                .isInstanceOf(MissingDocMappingException.class);
+    }
+
+    @Test
+    void throwsWhenNoPrefixMatches() throws IOException {
+        Path file = tempDir.resolve("doc-mappings.yaml");
+        Files.writeString(file, "prefixes:\n  \"AIT:\": \"_Notes/Teams/AIT\"\n");
+        var adapter = new ManualDocNameResolverAdapter(file);
+
+        assertThatThrownBy(() -> adapter.resolveDocName("ODM: Sprint review"))
+                .isInstanceOf(MissingDocMappingException.class);
     }
 
     @Test

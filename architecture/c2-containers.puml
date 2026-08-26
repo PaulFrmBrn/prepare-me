@@ -12,7 +12,7 @@ System_Boundary(app, "Prepare Me") {
     Container(plannerAdapter, "Planner Adapter",      "Java",                  "Implements MeetingBoardPort. Creates cards in 'Meetings' list; reads ordered card list with topics (incl. card IDs); posts comments on topic cards. Handles Trello OAuth 1.0a PIN flow internally (first run only); persists token to ~/.prepare-me/tokens/trello.json.")
     Container(notesAdapter,  "Notes Storage Adapter", "Java",                  "Implements MeetingNotesPort. Searches for note documents by name; appends dated Heading 1 + topics; reads back topic sections as TopicContent.")
     Container(googleAuth,    "Google Auth Provider",  "Java",                  "Shared OAuth 2.0 token lifecycle (Calendar + Drive). Persists tokens to ~/.prepare-me/tokens/google.json.")
-    Container(manualResolver,"Manual Doc Name Resolver", "Java / YAML",        "Implements ManualLinkResolverPort. Reads ~/.prepare-me/doc-mappings.yaml; throws MissingDocMappingException with hint if meeting title is absent.")
+    Container(manualResolver,"Manual Doc Name Resolver", "Java / YAML",        "Implements ManualLinkResolverPort. Reads ~/.prepare-me/doc-mappings.yaml (exact titles + title-prefix rules); throws MissingDocMappingException with hint if nothing matches.")
     Container(composition,   "AppComposition",        "Java",                  "Manual DI root — wires auth providers → adapters → use cases → CLI commands.")
 }
 
