@@ -271,7 +271,7 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
 
             List<TopicContent> result = new ArrayList<>();
             String currentTopicName = null;
-            StringBuilder currentBody = new StringBuilder();
+            TopicBody currentBody = new TopicBody();
 
             for (int i = meetingHeadingIndex + 1; i < paragraphs.size(); i++) {
                 Paragraph p = paragraphs.get(i);
@@ -281,21 +281,20 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
 
                 if (isTopicHeading(p)) {
                     if (currentTopicName != null) {
-                        String body = currentBody.toString().stripTrailing();
+                        String body = currentBody.toString();
                         if (!body.isEmpty()) {
                             result.add(new TopicContent(currentTopicName, body));
                         }
                     }
                     currentTopicName = text.startsWith("> ") ? text.substring(2) : text;
-                    currentBody = new StringBuilder();
+                    currentBody = new TopicBody();
                 } else if (currentTopicName != null && !text.isEmpty()) {
-                    if (currentBody.length() > 0) currentBody.append("\n");
-                    currentBody.append(formatBodyLine(p, text));
+                    currentBody.append(p, text);
                 }
             }
 
             if (currentTopicName != null) {
-                String body = currentBody.toString().stripTrailing();
+                String body = currentBody.toString();
                 if (!body.isEmpty()) {
                     result.add(new TopicContent(currentTopicName, body));
                 }
@@ -325,11 +324,59 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
                 .collect(Collectors.joining());
     }
 
+    /**
+     * Renders one notes paragraph as Trello-comment markdown.
+     *
+     * <p>Trello comments render bullet lists but not headings, so a heading paragraph
+     * (e.g. a HEADING_3 section title inside the notes) is emitted as bold text instead —
+     * otherwise it arrives as an unstyled line that Trello folds into the preceding bullet.</p>
+     */
     static String formatBodyLine(Paragraph paragraph, String text) {
+        String content = isHeadingStyle(paragraph) && !text.isBlank() ? "**" + text.strip() + "**" : text;
         Bullet bullet = paragraph.getBullet();
-        if (bullet == null) return text;
+        if (bullet == null) return content;
         int level = bullet.getNestingLevel() != null ? bullet.getNestingLevel() : 0;
-        return "  ".repeat(level) + "- " + text;
+        return "  ".repeat(level) + "- " + content;
+    }
+
+    /** True for a heading paragraph that is not part of a bullet list. */
+    static boolean isStandaloneHeading(Paragraph paragraph) {
+        return paragraph.getBullet() == null && isHeadingStyle(paragraph);
+    }
+
+    private static boolean isHeadingStyle(Paragraph paragraph) {
+        ParagraphStyle style = paragraph.getParagraphStyle();
+        if (style == null) return false;
+        String named = style.getNamedStyleType();
+        return named != null
+                && (named.startsWith("HEADING_") || named.equals("TITLE") || named.equals("SUBTITLE"));
+    }
+
+    /**
+     * Accumulates the body text of one topic as Trello-comment markdown.
+     *
+     * <p>A standalone heading gets a blank line on both sides: without it Trello's markdown
+     * reads the heading as a lazy continuation of the preceding bullet item and glues it onto
+     * that line.</p>
+     */
+    static final class TopicBody {
+
+        private final StringBuilder text = new StringBuilder();
+        private boolean previousWasHeading;
+
+        void append(Paragraph paragraph, String lineText) {
+            boolean isHeading = isStandaloneHeading(paragraph);
+            if (!text.isEmpty()) {
+                text.append(previousWasHeading || isHeading ? "\n\n" : "\n");
+            }
+            text.append(formatBodyLine(paragraph, lineText));
+            previousWasHeading = isHeading;
+        }
+
+        @Override
+        public String toString() {
+            return text.toString().stripTrailing();
+        }
     }
 
     /** Navigates Drive folder hierarchy and returns the ID of the deepest folder, or null if not found. */
