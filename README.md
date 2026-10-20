@@ -4,13 +4,17 @@ A CLI tool that automates the daily meeting preparation routine — turning a Go
 
 ## What it does
 
-Each working day involves two automated phases separated by a short manual step:
+Each working day runs through three automated phases, with manual steps in between:
 
 **Draft Plan** — Pull today's meetings from Google Calendar and create a Trello card for each one in the *Meetings* list of the *work* board.
 
 **Add Topics (not automated)** — Reorder the Trello cards and add topic cards beneath each meeting card following your own judgement.
 
 **Create Agenda** — Read the ordered Trello cards, locate the Google Doc for each meeting, and append a dated heading (`yyyy-MM-dd`) with the agenda topics pulled from Trello.
+
+**Take Notes (not automated)** — During each call, write under the topic headings in the Google Doc.
+
+**Save Notes** — Read back the topic sections written during the calls and post each one as a comment on the matching Trello topic card.
 
 At the end of Create Agenda the tool prints a numbered list of Google Doc links — one per meeting — ready to open before each call.
 
@@ -60,12 +64,22 @@ Open `~/.prepare-me/settings.yaml` and set:
 - `trello.apiToken` — the token from step 4
 - `trello.boardName` — exact name of your Trello board (case-sensitive)
 - `trello.meetingsListName` — exact name of the list to create cards in
-- `docMappingsFile` — path to `doc-mappings.yaml`, which maps meetings to notes documents in Google Drive for `create-agenda` and `save-notes`. It has two sections: `titles` (exact calendar event title → document) and `prefixes` (title prefix → document, e.g. `"AIT:"` maps every `AIT: ...` team meeting to one document; the longest matching prefix wins and an exact `titles` entry always wins over a prefix). 1-1 meetings named `Name / Dmitry` need no entry — they resolve to `People/<Name>` automatically. A group meeting matching neither section is skipped with a message telling you what to add.
-- `excludedEvents` — list of calendar event titles to ignore during `draft-plan` (e.g. "Out of office", "Lunch"). The template includes common defaults; extend it for any recurring non-meeting events on your calendar.
+- `notesDir` — root folder in Google Drive holding all notes documents (default `_Notes`)
+- `docMappingsFile` — path to `doc-mappings.yaml` (default `~/.prepare-me/doc-mappings.yaml`)
+- `excludedEventsFile` — path to `excluded-events.yaml` (default `~/.prepare-me/excluded-events.yaml`)
 
 The Google credentials path is already set to the correct default.
 
-Alternatively, you can skip copying and edit `settings.yaml` directly in the project root — the app checks the project root first before falling back to `~/.prepare-me/settings.yaml`.
+The last two settings point at the other two config files, which live beside `settings.yaml`:
+
+```bash
+cp doc-mappings.yaml excluded-events.yaml ~/.prepare-me/
+```
+
+- **`doc-mappings.yaml`** maps meetings to notes documents in Google Drive for `create-agenda` and `save-notes`. It has two sections: `titles` (exact calendar event title → document) and `prefixes` (title prefix → document, e.g. `"AIT:"` maps every `AIT: ...` team meeting to one document; the longest matching prefix wins and an exact `titles` entry always wins over a prefix). 1-1 meetings named `Name / Dmitry` need no entry — they resolve to `People/<Name>` automatically. A group meeting matching neither section is skipped with a message telling you what to add.
+- **`excluded-events.yaml`** is a YAML list of calendar event titles to ignore during `draft-plan` (e.g. "Out of office", "Lunch"). The template includes common defaults; extend it for any recurring non-meeting events on your calendar. Exclusions belong in this file — they are not hardcoded anywhere.
+
+Alternatively, you can skip copying and edit all three files directly in the project root — each one is read from the current directory first and only then from `~/.prepare-me/`. Note that this cuts both ways: a stray copy left in the directory you run from shadows the one in `~/.prepare-me/`.
 
 ### 4. Build
 
@@ -73,6 +87,20 @@ Alternatively, you can skip copying and edit `settings.yaml` directly in the pro
 gradle wrapper        # only needed once if ./gradlew doesn't exist yet
 ./gradlew installDist # builds the app to build/install/prepare-me/
 ```
+
+## Commands
+
+Every action is a subcommand — a bare `./gradlew run` with no `--args` only prints the help screen.
+
+| Command | What it does |
+|---|---|
+| `draft-plan` | Calendar → Trello cards (phase 1) |
+| `create-agenda` | Trello topics → dated agenda in the notes docs (phase 2) |
+| `save-notes` | Notes doc sections → comments on the Trello topic cards (phase 3) |
+| `serve` | Start the web UI, which can run all three |
+
+The three phase commands take `--date yyyy-MM-dd` and default to today; `serve` takes `--port` and
+defaults to 8080. Add `--help` to any of them for the full option list.
 
 ## Web UI
 
@@ -129,7 +157,27 @@ Reads the Meetings list from Trello, finds the Google Doc for each meeting, and 
 
 The command prints a numbered list of Google Doc links — one per processed meeting — ready to open before each call.
 
+Re-running it for the same day is safe: each agenda is written inside a named range keyed by meeting and date, and an existing one is not appended a second time.
+
 Group meetings matched by neither the `titles` nor the `prefixes` section of `~/.prepare-me/doc-mappings.yaml` are skipped with a message showing the exact entry to add.
+
+### Phase 2.5 — Take Notes (manual)
+
+During each call, write your notes in the Google Doc under the topic headings that Create Agenda
+added.
+
+### Phase 3 — Save Notes
+
+Reads back the topic sections of each notes document and posts every topic's text as a comment on
+the matching Trello topic card, so the board carries the outcome of the day.
+
+```bash
+./gradlew run --args="save-notes"           # today
+./gradlew run --args="save-notes --date 2026-04-14"   # specific date
+```
+
+Comments are posted unconditionally, so running the command twice for the same day posts each
+topic's notes to Trello twice.
 
 ---
 
@@ -138,6 +186,7 @@ Group meetings matched by neither the `titles` nor the `prefixes` section of `~/
 > ./gradlew installDist
 > build/install/prepare-me/bin/prepare-me draft-plan
 > build/install/prepare-me/bin/prepare-me create-agenda
+> build/install/prepare-me/bin/prepare-me save-notes
 > ```
 > Re-run `./gradlew installDist` after any code change.
 
@@ -151,6 +200,7 @@ On the first run a browser tab will open for Google OAuth — approve it and the
 | [C2 — Containers](architecture/c2-containers.puml) | Internal structure and adapter boundaries |
 | [Sequence — Draft Plan](architecture/sequence-draft-plan.md) | End-to-end flow for the draft-plan command |
 | [Sequence — Create Agenda](architecture/sequence-create-agenda.md) | End-to-end flow for the create-agenda command |
+| [Sequence — Save Notes](architecture/sequence-save-notes.md) | End-to-end flow for the save-notes command |
 | [Domain Vocabulary](architecture/domain-vocabulary.md) | Key concepts, port definitions, and naming conventions |
 
 The application follows a hexagonal (ports & adapters) architecture. The domain layer has no dependency on Google, Trello, or any I/O framework. See [Domain Vocabulary](architecture/domain-vocabulary.md) for the full concept map.

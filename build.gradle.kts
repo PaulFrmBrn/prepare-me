@@ -7,8 +7,12 @@ group = "com.paulfrmbrn"
 version = "1.0-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_23
-    targetCompatibility = JavaVersion.VERSION_23
+    // A toolchain, not sourceCompatibility: the latter compiles with whatever JVM happens to be
+    // running Gradle, so a JAVA_HOME pointing at an older JDK fails with "invalid source release".
+    // Gradle locates a matching JDK itself and the build no longer depends on the shell.
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 application {
@@ -49,8 +53,10 @@ dependencies {
     // Tests
     testImplementation(platform("org.junit:junit-bom:5.11.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.14.2")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.23.0")
     testImplementation("org.assertj:assertj-core:3.27.3")
+    // Gradle 9 no longer puts the JUnit Platform launcher on the test runtime classpath.
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {

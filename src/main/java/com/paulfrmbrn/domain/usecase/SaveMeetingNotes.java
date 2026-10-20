@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -29,15 +28,12 @@ import java.util.stream.Collectors;
  * that were filled in after Create Agenda, and posts each topic's body text as a comment on the
  * corresponding Trello topic card.</p>
  *
- * <p>Doc-finding logic (1-1 detection, drive path resolution) mirrors {@link PrepareMeetingNotes}.</p>
+ * <p>Doc-finding logic (1-1 detection, drive path resolution) mirrors {@link PrepareMeetingNotes};
+ * both resolve the other person's name through {@link OneOnOneTitle}.</p>
  */
 public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(SaveMeetingNotes.class);
-
-    private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^([^/]+)\\s*/\\s*(Dima|Dmitry|Dmitrii)(?:[:\\s].*)?$" +
-                    "|^(Dima|Dmitry|Dmitrii)\\s*/\\s*([^/:]+)(?:[:\\s].*)?$");
 
     private final MeetingBoardPort board;
     private final CalendarPort calendar;
@@ -62,7 +58,7 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
                 .map(m -> m.name() + " (" + m.topics().size() + " topics)").toList());
 
         Map<String, Meeting> calendarByTitle = calendar.getMeetings(date).stream()
-                .collect(Collectors.toMap(Meeting::name, Function.identity(), (a, _) -> a));
+                .collect(Collectors.toMap(Meeting::name, Function.identity(), (a, b) -> a));
 
         Map<String, Integer> result = new LinkedHashMap<>();
 
@@ -81,7 +77,7 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
                 drivePath = resolver.resolveDocName(eventTitle);
             } catch (MissingDocMappingException e) {
                 if (type == MeetingType.ONE_ON_ONE) {
-                    String personName = extractOtherPersonName(eventTitle);
+                    String personName = OneOnOneTitle.otherPersonName(eventTitle);
                     drivePath = notesDir + "/People/" + personName;
                 } else {
                     log.warn("No doc mapping for '{}', skipping", eventTitle);
@@ -100,7 +96,7 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
             List<TopicContent> topicContents = notes.readTopicNotes(docRef.get(), date, eventTitle);
 
             Map<String, String> topicIdByName = meetingCard.topics().stream()
-                    .collect(Collectors.toMap(t -> t.name(), t -> t.id(), (a, _) -> a));
+                    .collect(Collectors.toMap(t -> t.name(), t -> t.id(), (a, b) -> a));
             log.debug("Trello topics for '{}': {}", eventTitle, topicIdByName.keySet());
 
             int postedCount = 0;
@@ -123,24 +119,12 @@ public class SaveMeetingNotes implements SaveMeetingNotesUseCase {
     }
 
     private MeetingType detectType(String eventTitle, Meeting calEntry) {
-        if (!ONE_ON_ONE_PATTERN.matcher(eventTitle).matches()) {
+        if (!OneOnOneTitle.matches(eventTitle)) {
             return MeetingType.GROUP;
         }
         if (calEntry != null && calEntry.attendees().size() > 2) {
             return MeetingType.GROUP;
         }
         return MeetingType.ONE_ON_ONE;
-    }
-
-    String extractOtherPersonName(String eventTitle) {
-        var matcher = ONE_ON_ONE_PATTERN.matcher(eventTitle);
-        if (!matcher.matches()) {
-            throw new IllegalArgumentException("Not a 1-1 title: " + eventTitle);
-        }
-        String name = matcher.group(1) != null ? matcher.group(1) : matcher.group(4);
-        name = name.trim();
-        // Strip ticket prefix like "ODM-12259. " before the person name
-        name = name.replaceFirst("^[A-Z]+-\\d+\\.\\s*", "");
-        return name;
     }
 }

@@ -7,12 +7,16 @@ import com.google.api.services.docs.v1.model.ParagraphElement;
 import com.google.api.services.docs.v1.model.ParagraphStyle;
 import com.google.api.services.docs.v1.model.RichLink;
 import com.google.api.services.docs.v1.model.RichLinkProperties;
+import com.google.api.services.docs.v1.model.NamedRange;
+import com.google.api.services.docs.v1.model.NamedRanges;
+import com.google.api.services.docs.v1.model.Range;
 import com.google.api.services.docs.v1.model.StructuralElement;
 import com.google.api.services.docs.v1.model.TextRun;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,6 +24,65 @@ class GoogleNotesAdapterIdempotencyTest {
 
     static final LocalDate DATE = LocalDate.of(2026, 5, 21);
     static final String MEETING = "Ivan / Dima";
+
+    @Test
+    void agendaRangeName_isUniquePerMeetingAndDate() {
+        assertThat(GoogleNotesAdapter.agendaRangeName(MEETING, DATE))
+                .isEqualTo("prepare-me:agenda:2026-05-21:Ivan / Dima");
+        assertThat(GoogleNotesAdapter.agendaRangeName(MEETING, DATE.plusDays(1)))
+                .isNotEqualTo(GoogleNotesAdapter.agendaRangeName(MEETING, DATE));
+        assertThat(GoogleNotesAdapter.agendaRangeName("Other / Dima", DATE))
+                .isNotEqualTo(GoogleNotesAdapter.agendaRangeName(MEETING, DATE));
+    }
+
+    @Test
+    void agendaRangeName_truncatesToDocsNameLimit() {
+        String name = GoogleNotesAdapter.agendaRangeName("x".repeat(400), DATE);
+        assertThat(name).hasSize(256).startsWith("prepare-me:agenda:2026-05-21:");
+    }
+
+    private static NamedRanges markerCovering(int start, int end) {
+        return new NamedRanges().setNamedRanges(List.of(new NamedRange()
+                .setRanges(List.of(new Range().setStartIndex(start).setEndIndex(end)))));
+    }
+
+    @Test
+    void agendaMarked_trueForMarkerCoveringLiveContent() {
+        String name = GoogleNotesAdapter.agendaRangeName(MEETING, DATE);
+        assertThat(GoogleNotesAdapter.agendaMarked(Map.of(name, markerCovering(10, 24)), name)).isTrue();
+    }
+
+    @Test
+    void agendaMarked_falseWhenMarkerAbsent() {
+        String name = GoogleNotesAdapter.agendaRangeName(MEETING, DATE);
+        assertThat(GoogleNotesAdapter.agendaMarked(null, name)).isFalse();
+        assertThat(GoogleNotesAdapter.agendaMarked(Map.of(), name)).isFalse();
+        assertThat(GoogleNotesAdapter.agendaMarked(
+                Map.of("prepare-me:agenda:2026-05-20:Ivan / Dima", markerCovering(10, 24)), name)).isFalse();
+    }
+
+    @Test
+    void agendaMarked_falseWhenMarkerEmptied() {
+        // Entry deleted by hand: an emptied range must not suppress the re-append.
+        String name = GoogleNotesAdapter.agendaRangeName(MEETING, DATE);
+        assertThat(GoogleNotesAdapter.agendaMarked(Map.of(name, markerCovering(10, 10)), name)).isFalse();
+        assertThat(GoogleNotesAdapter.agendaMarked(Map.of(name, new NamedRanges()), name)).isFalse();
+        assertThat(GoogleNotesAdapter.agendaMarked(
+                Map.of(name, new NamedRanges().setNamedRanges(List.of(new NamedRange()))), name)).isFalse();
+    }
+
+    @Test
+    void hasAgendaMarker_falseWhenAbsentOrUnmarked() {
+        assertThat(GoogleNotesAdapter.hasAgendaMarker(null)).isFalse();
+        assertThat(GoogleNotesAdapter.hasAgendaMarker(Map.of())).isFalse();
+        assertThat(GoogleNotesAdapter.hasAgendaMarker(Map.of("some-other-range", new NamedRanges()))).isFalse();
+    }
+
+    @Test
+    void hasAgendaMarker_trueForAnyAgendaRange() {
+        assertThat(GoogleNotesAdapter.hasAgendaMarker(
+                Map.of(GoogleNotesAdapter.agendaRangeName(MEETING, DATE), new NamedRanges()))).isTrue();
+    }
 
     @Test
     void noContent_returnsFalse() {

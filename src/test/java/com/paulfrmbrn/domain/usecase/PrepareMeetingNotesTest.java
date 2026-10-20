@@ -101,6 +101,24 @@ class PrepareMeetingNotesTest {
     }
 
     @Test
+    void oneOnOneMeeting_multiWordName_keepsWholeNameInPath() {
+        when(board.getMeetingsWithTopics()).thenReturn(List.of(
+                new MeetingWithTopics("Meeting: Oleg K / Dmitry", List.of())
+        ));
+        when(calendar.getMeetings(DATE)).thenReturn(List.of(
+                new Meeting("Oleg K / Dmitry", List.of("oleg@example.com", "dmitry@example.com"))
+        ));
+        when(resolver.resolveDocName("Oleg K / Dmitry")).thenThrow(new MissingDocMappingException("Oleg K / Dmitry"));
+        var docRef = new DocRef("doc5", "https://docs.google.com/doc5");
+        when(notes.findDoc("_Notes/People/Oleg K")).thenReturn(Optional.of(docRef));
+
+        var result = useCase.execute(DATE);
+
+        assertThat(result).containsExactly(Map.entry("Oleg K / Dmitry", "https://docs.google.com/doc5"));
+        verify(notes).findDoc("_Notes/People/Oleg K");
+    }
+
+    @Test
     void groupMeeting_usesResolverPathAndFindsDoc() {
         var topics = List.of(new Topic("", "action items", List.of()));
         when(board.getMeetingsWithTopics()).thenReturn(List.of(
@@ -192,35 +210,5 @@ class PrepareMeetingNotesTest {
 
         assertThat(result).isEmpty();
         verifyNoInteractions(notes, resolver);
-    }
-
-    @Test
-    void extractOtherPersonName_nameBeforeDima() {
-        assertThat(useCase.extractOtherPersonName("Ivan / Dima")).isEqualTo("Ivan");
-    }
-
-    @Test
-    void extractOtherPersonName_nameAfterDmitry() {
-        assertThat(useCase.extractOtherPersonName("Dmitry / Maria")).isEqualTo("Maria");
-    }
-
-    @Test
-    void extractOtherPersonName_dmitriiVariant() {
-        assertThat(useCase.extractOtherPersonName("Dmitrii / Olga")).isEqualTo("Olga");
-    }
-
-    @Test
-    void extractOtherPersonName_withTicketPrefix() {
-        assertThat(useCase.extractOtherPersonName("ODM-12259. Mikhail / Dmitry")).isEqualTo("Mikhail");
-    }
-
-    @Test
-    void extractOtherPersonName_withMilestoneSuffix() {
-        assertThat(useCase.extractOtherPersonName("Ivan / Dmitry - milestone 3")).isEqualTo("Ivan");
-    }
-
-    @Test
-    void extractOtherPersonName_withChatPrefix() {
-        assertThat(useCase.extractOtherPersonName("Random chat 2 - Gleb / Dmitry")).isEqualTo("Gleb");
     }
 }

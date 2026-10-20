@@ -1,6 +1,5 @@
 package com.paulfrmbrn.adapter.out.google.calendar;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
@@ -31,8 +30,7 @@ public class GoogleCalendarAdapter implements CalendarPort {
     @Override
     public List<Meeting> getMeetings(LocalDate date) {
         try {
-            var transport = GoogleNetHttpTransport.newTrustedTransport();
-            var service = new Calendar.Builder(transport, GsonFactory.getDefaultInstance(), auth.getCredential())
+            var service = new Calendar.Builder(auth.getTransport(), GsonFactory.getDefaultInstance(), auth.requestInitializer())
                     .setApplicationName("PrepareMe")
                     .build();
 

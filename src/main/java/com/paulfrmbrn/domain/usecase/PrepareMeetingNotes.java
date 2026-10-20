@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -41,8 +40,8 @@ import java.util.stream.Collectors;
  * processed (document found and agenda appended).  The order matches the card order on the board.</p>
  *
  * <h2>Meeting-type classification</h2>
- * <p>Each Trello card's title is stripped of the {@code "Meeting: "} prefix and compared
- * against a regex pattern {@code <Name> / Dima|Dmitry|Dmitrii} (both orderings).  If the
+ * <p>Each Trello card's title is stripped of the {@code "Meeting: "} prefix and matched by
+ * {@link OneOnOneTitle} against {@code <Name> / Dima|Dmitry|Dmitrii} (both orderings).  If the
  * title matches <em>and</em> Google Calendar confirms at most two attendees, the meeting is
  * classified as {@code ONE_ON_ONE}; otherwise it is {@code GROUP}.</p>
  *
@@ -108,14 +107,6 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PrepareMeetingNotes.class);
 
-    // Matches "Name / Dima", "Name/Dima", "Prefix Name / Dima", "Name / Dima suffix", etc.
-    // Spaces around "/" are optional. Optional prefix (e.g. ticket id "ODM-12259. ") and
-    // suffix (e.g. " - milestone 3", ": Databricks prep call") are allowed.
-    // [^/] in the prefix part ensures titles with multiple "/" (e.g. "A / B / Dmitry") are not matched.
-    private static final Pattern ONE_ON_ONE_PATTERN =
-            Pattern.compile("^(?:[^/]*?\\s)?([A-Za-z]+)\\s*/\\s*(Dima|Dmitry|Dmitrii)(?:[:\\s].*)?$" +
-                    "|^(?:[^/]*?\\s)?(Dima|Dmitry|Dmitrii)\\s*/\\s*([A-Za-z]+)(?:[:\\s].*)?$");
-
     private final MeetingBoardPort board;
     private final CalendarPort calendar;
     private final MeetingNotesPort notes;
@@ -140,7 +131,7 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
 
         // Build a name→Meeting map for attendee lookup (strip "Meeting: " prefix)
         Map<String, Meeting> calendarByTitle = calendar.getMeetings(date).stream()
-                .collect(Collectors.toMap(Meeting::name, Function.identity(), (a, _) -> a));
+                .collect(Collectors.toMap(Meeting::name, Function.identity(), (a, b) -> a));
 
         Map<String, String> result = new LinkedHashMap<>();
 
@@ -160,7 +151,7 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
                 drivePath = resolver.resolveDocName(eventTitle);
             } catch (MissingDocMappingException e) {
                 if (type == MeetingType.ONE_ON_ONE) {
-                    String personName = extractOtherPersonName(eventTitle);
+                    String personName = OneOnOneTitle.otherPersonName(eventTitle);
                     drivePath = notesDir + "/People/" + personName;
                 } else {
                     log.warn("No doc mapping for '{}', skipping", eventTitle);
@@ -185,7 +176,7 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
     }
 
     private MeetingType detectType(String eventTitle, Meeting calEntry) {
-        if (!ONE_ON_ONE_PATTERN.matcher(eventTitle).matches()) {
+        if (!OneOnOneTitle.matches(eventTitle)) {
             return MeetingType.GROUP;
         }
         // Title matches 1-1 pattern; only override to GROUP if Calendar confirms > 2 attendees
@@ -193,16 +184,5 @@ public class PrepareMeetingNotes implements PrepareMeetingNotesUseCase {
             return MeetingType.GROUP;
         }
         return MeetingType.ONE_ON_ONE;
-    }
-
-    String extractOtherPersonName(String eventTitle) {
-        var matcher = ONE_ON_ONE_PATTERN.matcher(eventTitle);
-        if (!matcher.matches()) {
-            throw new IllegalArgumentException("Not a 1-1 title: " + eventTitle);
-        }
-        // Group 1: "Name / Dima" — other name is group 1
-        // Group 4: "Dima / Name" — other name is group 4
-        String name = matcher.group(1) != null ? matcher.group(1) : matcher.group(4);
-        return name.trim();
     }
 }

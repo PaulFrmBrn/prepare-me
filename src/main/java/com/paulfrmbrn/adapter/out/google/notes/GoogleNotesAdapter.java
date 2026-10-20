@@ -1,14 +1,15 @@
 package com.paulfrmbrn.adapter.out.google.notes;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.docs.v1.Docs;
 import com.google.api.services.docs.v1.model.BatchUpdateDocumentRequest;
+import com.google.api.services.docs.v1.model.CreateNamedRangeRequest;
 import com.google.api.services.docs.v1.model.DateElementProperties;
 import com.google.api.services.docs.v1.model.Document;
 import com.google.api.services.docs.v1.model.InsertDateRequest;
 import com.google.api.services.docs.v1.model.InsertTextRequest;
 import com.google.api.services.docs.v1.model.Location;
+import com.google.api.services.docs.v1.model.NamedRanges;
 import com.google.api.services.docs.v1.model.Bullet;
 import com.google.api.services.docs.v1.model.Paragraph;
 import com.google.api.services.docs.v1.model.ParagraphStyle;
@@ -27,17 +28,50 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.security.GeneralSecurityException;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class GoogleNotesAdapter implements MeetingNotesPort {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleNotesAdapter.class);
+
+    /**
+     * Marks an appended agenda entry so a later run can recognise it without reading the notes.
+     * The Docs API has no range read, so the only way to keep the idempotency check cheap on a
+     * long-lived document is to check something whose size tracks the number of agenda entries
+     * rather than the length of the document.
+     */
+    private static final String AGENDA_RANGE_PREFIX = "prepare-me:agenda:";
+
+    /** Docs caps named range names at 256 characters. */
+    private static final int MAX_RANGE_NAME_LENGTH = 256;
+
+    /**
+     * Locator read: the agenda markers plus the paragraph end indices, and nothing else. This is
+     * the only read on the append path and it transfers no document text.
+     */
+    private static final String LOCATOR_FIELDS = "namedRanges,body.content(endIndex)";
+
+    /**
+     * Full-text mask, used by {@link #readTopicNotes} and by the one-time legacy scan. Only the
+     * paragraph text, named style and bullet level are used. Without it the API returns the full
+     * style metadata of every text run, which is an order of magnitude more data again.
+     */
+    private static final String DOCUMENT_FIELDS =
+            "body.content("
+            + "endIndex,"
+            + "paragraph("
+            + "bullet(nestingLevel),"
+            + "paragraphStyle(namedStyleType),"
+            + "elements(textRun(content),richLink(richLinkProperties(title,uri,mimeType)))"
+            + "))";
 
     // Supported mime types: native Google Docs and uploaded .docx files
     private static final String MIME_QUERY =
@@ -105,19 +139,39 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
     public void appendAgenda(DocRef doc, LocalDate date, String meetingName, List<Topic> topics) {
         try {
             var docs = buildDocs();
+            String rangeName = agendaRangeName(meetingName, date);
 
-            var document = docs.documents().get(doc.id()).execute();
+            var locator = docs.documents().get(doc.id()).setFields(LOCATOR_FIELDS).execute();
+            Map<String, NamedRanges> markers = locator.getNamedRanges();
 
-            if (agendaEntryExists(document, meetingName, date)) {
+            if (agendaMarked(markers, rangeName)) {
                 log.info("Agenda for '{}' on {} already exists in document {}, skipping", meetingName, date, doc.id());
                 return;
             }
 
-            int endIndex = document.getBody().getContent().stream()
+            List<StructuralElement> content = locator.getBody().getContent();
+            int endIndex = content.stream()
                     .mapToInt(e -> e.getEndIndex() != null ? e.getEndIndex() : 0)
                     .max()
                     .orElse(1);
             int insertAt = Math.max(1, endIndex - 1);
+
+            // Entries appended before marker tracking existed carry no named range, so fall back to
+            // the full-text scan. This costs one expensive read per document, once: the append below
+            // leaves a marker behind and every later run takes the cheap path above.
+            if (!hasAgendaMarker(markers)) {
+                log.debug("No agenda markers in document {}, falling back to full-text scan", doc.id());
+                Document full;
+                try {
+                    full = docs.documents().get(doc.id()).setFields(DOCUMENT_FIELDS).execute();
+                } catch (SocketTimeoutException e) {
+                    throw oversizedDocument("Scanning", doc, endIndex, content.size(), e);
+                }
+                if (agendaEntryExists(full, meetingName, date)) {
+                    log.info("Agenda for '{}' on {} already exists in document {}, skipping", meetingName, date, doc.id());
+                    return;
+                }
+            }
 
             // Text: \n[space]{meetingName}\n{topics}
             // The leading space is the separator between the date chip and the meeting name.
@@ -142,8 +196,17 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
             ));
             // 3. Apply HEADING_2/3 to topic and checklist lines
             requests.addAll(buildHeadingStyleRequests(text, insertAt));
-            // 4. Insert date chip at insertAt+1 (before the space) — done last to avoid
-            //    shifting the indices used in requests 2 and 3
+            // 4. Mark the heading so the next run recognises this entry without reading the notes.
+            //    Uses pre-chip indices like request 2; the chip insertion shifts the range with it.
+            requests.add(new Request().setCreateNamedRange(
+                    new CreateNamedRangeRequest()
+                            .setName(rangeName)
+                            .setRange(new Range()
+                                    .setStartIndex(insertAt + 1)
+                                    .setEndIndex(insertAt + meetingName.length() + 3))
+            ));
+            // 5. Insert date chip at insertAt+1 (before the space) — done last to avoid
+            //    shifting the indices used in requests 2, 3 and 4
             requests.add(new Request().setInsertDate(
                     new InsertDateRequest()
                             .setLocation(new Location().setIndex(insertAt + 1))
@@ -163,6 +226,83 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
         }
     }
 
+    /** Name of the marker identifying one meeting's agenda entry for one date. */
+    static String agendaRangeName(String meetingName, LocalDate date) {
+        String name = AGENDA_RANGE_PREFIX + date + ":" + meetingName;
+        return name.length() <= MAX_RANGE_NAME_LENGTH ? name : name.substring(0, MAX_RANGE_NAME_LENGTH);
+    }
+
+    /**
+     * True if this document still carries a marker covering live content for this entry.
+     *
+     * <p>Google's documentation states only that named range indexes track edits; it does not say
+     * what survives when a person deletes the content a range covers. An emptied range is therefore
+     * treated as absent, so that manually deleting an agenda entry makes the next run re-append it
+     * under either behaviour.</p>
+     */
+    static boolean agendaMarked(Map<String, NamedRanges> namedRanges, String rangeName) {
+        if (namedRanges == null) return false;
+        NamedRanges named = namedRanges.get(rangeName);
+        if (named == null || named.getNamedRanges() == null) return false;
+        return named.getNamedRanges().stream()
+                .filter(r -> r.getRanges() != null)
+                .flatMap(r -> r.getRanges().stream())
+                .anyMatch(r -> r.getStartIndex() != null && r.getEndIndex() != null
+                        && r.getEndIndex() > r.getStartIndex());
+    }
+
+    /** True if this document has been appended to since marker tracking was introduced. */
+    static boolean hasAgendaMarker(Map<String, NamedRanges> namedRanges) {
+        return namedRanges != null
+                && namedRanges.keySet().stream().anyMatch(n -> n.startsWith(AGENDA_RANGE_PREFIX));
+    }
+
+    /**
+     * Cheap size probe for error reporting: paragraph end indices only, no document text.
+     * Returns {@code null} if even this fails, in which case the message omits the numbers.
+     */
+    private static int[] probeSize(Docs docs, DocRef doc) {
+        try {
+            var locator = docs.documents().get(doc.id()).setFields("body.content(endIndex)").execute();
+            List<StructuralElement> content = locator.getBody().getContent();
+            if (content == null) return null;
+            int chars = content.stream()
+                    .mapToInt(e -> e.getEndIndex() != null ? e.getEndIndex() : 0)
+                    .max()
+                    .orElse(0);
+            return new int[]{chars, content.size()};
+        } catch (Exception e) {
+            log.debug("Size probe for document {} failed: {}", doc.id(), e.toString());
+            return null;
+        }
+    }
+
+    private static RuntimeException oversizedDocument(
+            String action, DocRef doc, int[] size, SocketTimeoutException cause) {
+        return size == null
+                ? oversizedDocument(action, doc, -1, -1, cause)
+                : oversizedDocument(action, doc, size[0], size[1], cause);
+    }
+
+    /**
+     * A read timeout on a notes document is almost always the document having outgrown a single
+     * Docs API response, so say that outright instead of surfacing a bare "Read timed out".
+     */
+    private static RuntimeException oversizedDocument(
+            String action, DocRef doc, int characters, int elements, SocketTimeoutException cause) {
+        String size = characters < 0
+                ? "the document is too large to read in one response"
+                : String.format("the document holds ~%,d characters across %,d paragraphs", characters, elements);
+        String message = String.format(
+                "%s document '%s' timed out: %s. "
+                + "The Google Docs API has no range read, so the whole document is transferred in a single "
+                + "response and this only gets worse as the document grows. Split the notes document "
+                + "(for example one per year) or archive its older sections.",
+                action, doc.id(), size);
+        log.error(message);
+        return new RuntimeException(message, cause);
+    }
+
     /**
      * Returns true if a HEADING_1 paragraph containing {@code meetingName} already has a date chip
      * whose title or URI contains the ISO-8601 date string for {@code date}.
@@ -178,27 +318,11 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
             if (!extractText(paragraph).contains(meetingName)) continue;
             if (paragraph.getElements() == null) continue;
             for (var pe : paragraph.getElements()) {
-                // Log all non-text elements to help diagnose how date chips are returned
-                if (pe.getTextRun() == null) {
-                    log.info("Non-text element in HEADING_1 '{}': richLink={}, person={}, inlineObject={}, equation={}, raw={}",
-                            meetingName,
-                            pe.getRichLink(),
-                            pe.getPerson(),
-                            pe.getInlineObjectElement(),
-                            pe.getEquation(),
-                            pe);
-                    if (pe.getRichLink() != null) {
-                        log.info("  RichLink props: title={}, uri={}, mimeType={}",
-                                pe.getRichLink().getRichLinkProperties() != null ? pe.getRichLink().getRichLinkProperties().getTitle() : "null",
-                                pe.getRichLink().getRichLinkProperties() != null ? pe.getRichLink().getRichLinkProperties().getUri() : "null",
-                                pe.getRichLink().getRichLinkProperties() != null ? pe.getRichLink().getRichLinkProperties().getMimeType() : "null");
-                    }
-                }
                 var richLink = pe.getRichLink();
                 if (richLink == null || richLink.getRichLinkProperties() == null) continue;
                 String title = richLink.getRichLinkProperties().getTitle();
                 String uri = richLink.getRichLinkProperties().getUri();
-                log.info("Checking date chip in '{}': title='{}', uri='{}', looking for '{}'",
+                log.debug("Checking date chip in '{}': title='{}', uri='{}', looking for '{}'",
                         meetingName, title, uri, isoDate);
                 if ((title != null && title.contains(isoDate)) || (uri != null && uri.contains(isoDate))) {
                     return true;
@@ -246,7 +370,12 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
     public List<TopicContent> readTopicNotes(DocRef doc, LocalDate date, String meetingName) {
         try {
             var docs = buildDocs();
-            var document = docs.documents().get(doc.id()).execute();
+            Document document;
+            try {
+                document = docs.documents().get(doc.id()).setFields(DOCUMENT_FIELDS).execute();
+            } catch (SocketTimeoutException e) {
+                throw oversizedDocument("Reading", doc, probeSize(docs, doc), e);
+            }
             List<StructuralElement> content = document.getBody().getContent();
             if (content == null) return List.of();
 
@@ -404,15 +533,13 @@ public class GoogleNotesAdapter implements MeetingNotesPort {
     }
 
     private Drive buildDrive() throws IOException, GeneralSecurityException {
-        var transport = GoogleNetHttpTransport.newTrustedTransport();
-        return new Drive.Builder(transport, GsonFactory.getDefaultInstance(), auth.getCredential())
+        return new Drive.Builder(auth.getTransport(), GsonFactory.getDefaultInstance(), auth.requestInitializer())
                 .setApplicationName("PrepareMe")
                 .build();
     }
 
     private Docs buildDocs() throws IOException, GeneralSecurityException {
-        var transport = GoogleNetHttpTransport.newTrustedTransport();
-        return new Docs.Builder(transport, GsonFactory.getDefaultInstance(), auth.getCredential())
+        return new Docs.Builder(auth.getTransport(), GsonFactory.getDefaultInstance(), auth.requestInitializer())
                 .setApplicationName("PrepareMe")
                 .build();
     }

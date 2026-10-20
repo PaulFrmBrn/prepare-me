@@ -157,24 +157,4 @@ class SaveMeetingNotesTest {
         assertThat(result).isEmpty();
         verifyNoInteractions(notes);
     }
-
-    @Test
-    void extractOtherPersonName_nameBeforeDima() {
-        assertThat(useCase.extractOtherPersonName("Ivan / Dima")).isEqualTo("Ivan");
-    }
-
-    @Test
-    void extractOtherPersonName_multiWordNameBeforeDmitry() {
-        assertThat(useCase.extractOtherPersonName("Egor A / Dmitry: Random chat 2")).isEqualTo("Egor A");
-    }
-
-    @Test
-    void extractOtherPersonName_multiWordNameAfterDmitry() {
-        assertThat(useCase.extractOtherPersonName("Dmitry / Egor A: Random chat")).isEqualTo("Egor A");
-    }
-
-    @Test
-    void extractOtherPersonName_withTicketPrefix() {
-        assertThat(useCase.extractOtherPersonName("ODM-12259. Mikhail / Dmitry")).isEqualTo("Mikhail");
-    }
 }

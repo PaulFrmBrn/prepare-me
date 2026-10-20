@@ -51,7 +51,7 @@ public class Main {
                     .addSubcommand("create-agenda", new CreateAgendaCommand(prepareMeetingNotes))
                     .addSubcommand("save-notes",    new SaveNotesCommand(saveMeetingNotes))
                     .addSubcommand("serve",         new WebCommand(s))
-                    .setExecutionExceptionHandler((ex, cmd, _) -> {
+                    .setExecutionExceptionHandler((ex, cmd, parseResult) -> {
                         cmd.getErr().println("Error: " + ex.getMessage());
                         return 1;
                     })
